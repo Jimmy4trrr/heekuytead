@@ -1,0 +1,93 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local swordFolder = ReplicatedStorage:WaitForChild("SwordTools")
+
+-- UI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ToolSelectorUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- ปุ่มย่อ/ขยาย
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 100, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 10)
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleButton.BackgroundTransparency = 0.3
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Text = "🔽 Tools"
+toggleButton.Font = Enum.Font.Gotham
+toggleButton.TextSize = 16
+toggleButton.Parent = screenGui
+
+-- Frame หลักที่ไว้แสดง Tool
+local uiFrame = Instance.new("Frame")
+uiFrame.Size = UDim2.new(0, 250, 0, 300)
+uiFrame.Position = UDim2.new(0, 10, 0, 50)
+uiFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+uiFrame.BackgroundTransparency = 0.25
+uiFrame.BorderSizePixel = 0
+uiFrame.Visible = false
+uiFrame.Parent = screenGui
+
+-- มุมโค้งเล็กน้อย
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = uiFrame
+
+-- Layout
+local uiLayout = Instance.new("UIListLayout")
+uiLayout.Padding = UDim.new(0, 5)
+uiLayout.FillDirection = Enum.FillDirection.Vertical
+uiLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiLayout.Parent = uiFrame
+
+-- ScrollBar เผื่อ Tool เยอะ
+local scrolling = Instance.new("ScrollingFrame")
+scrolling.Size = UDim2.new(1, 0, 1, 0)
+scrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrolling.ScrollBarThickness = 6
+scrolling.BackgroundTransparency = 1
+scrolling.BorderSizePixel = 0
+scrolling.Parent = uiFrame
+
+local scrollLayout = uiLayout:Clone()
+scrollLayout.Parent = scrolling
+
+-- สร้างปุ่ม Tool
+for _, tool in ipairs(swordFolder:GetChildren()) do
+	if tool:IsA("Tool") then
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, -10, 0, 35)
+		button.Text = "⚔️ " .. tool.Name
+		button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		button.BackgroundTransparency = 0.15
+		button.TextColor3 = Color3.fromRGB(255, 255, 255)
+		button.Font = Enum.Font.Gotham
+		button.TextSize = 14
+		button.Parent = scrolling
+
+		local buttonCorner = Instance.new("UICorner")
+		buttonCorner.CornerRadius = UDim.new(0, 6)
+		buttonCorner.Parent = button
+
+		button.MouseButton1Click:Connect(function()
+			local cloned = tool:Clone()
+			cloned.Parent = player:WaitForChild("Backpack")
+		end)
+	end
+end
+
+-- อัปเดต CanvasSize ให้ ScrollFrame
+scrolling.CanvasSize = UDim2.new(0, 0, 0, scrollLayout.AbsoluteContentSize.Y)
+scrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	scrolling.CanvasSize = UDim2.new(0, 0, 0, scrollLayout.AbsoluteContentSize.Y)
+end)
+
+-- ปุ่มย่อ/ขยาย
+toggleButton.MouseButton1Click:Connect(function()
+	uiFrame.Visible = not uiFrame.Visible
+	toggleButton.Text = uiFrame.Visible and "🔼 Hide Tools" or "🔽 Tools"
+end)
