@@ -1,0 +1,103 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "FreeItemGui"
+screenGui.ResetOnSpawn = false
+
+local function styleFrame(f)
+    local corner = Instance.new("UICorner", f)
+    corner.CornerRadius = UDim.new(0, 10)
+    
+    local stroke = Instance.new("UIStroke", f)
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(100, 100, 100)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+end
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 230, 0, 200)
+mainFrame.Position = UDim2.new(0, 30, 0, 30)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+styleFrame(mainFrame)
+
+local titleBar = Instance.new("TextLabel")
+titleBar.Size = UDim2.new(1, -35, 0, 35)
+titleBar.Position = UDim2.new(0, 5, 0, 5)
+titleBar.BackgroundTransparency = 1
+titleBar.Text = "Kuyraisus  🔆"
+titleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleBar.TextSize = 18
+titleBar.Font = Enum.Font.GothamBold
+titleBar.TextXAlignment = Enum.TextXAlignment.Left
+titleBar.Parent = mainFrame
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 30, 0, 30)
+toggleButton.Position = UDim2.new(1, -35, 0, 5)
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+toggleButton.Text = "🔽"
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.Gotham
+toggleButton.TextSize = 16
+toggleButton.Parent = mainFrame
+styleFrame(toggleButton)
+
+local function createButton(name, yOffset, callback)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Text = name
+	button.Size = UDim2.new(1, -20, 0, 40)
+	button.Position = UDim2.new(0, 10, 0, yOffset)
+	button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.Gotham
+	button.TextSize = 14
+	button.AutoButtonColor = true
+	button.Parent = mainFrame
+	styleFrame(button)
+	button.MouseButton1Click:Connect(callback)
+	return button
+end
+
+local itemButton = createButton("Getfree item", 50, function()
+	local items = ReplicatedStorage:WaitForChild("Items")
+	for _, tool in pairs(items:GetChildren()) do
+		if tool:IsA("Tool") then
+			tool:Clone().Parent = player.Backpack
+		end
+	end
+end)
+
+local swordButton = createButton("Getfree Sword", 100, function()
+	local inv = player:WaitForChild("InventoryList")
+	for _, item in pairs(inv:GetChildren()) do
+		if item:IsA("BoolValue") then
+			item.Value = true
+		end
+	end
+end)
+
+local accButton = createButton("Getfree Accessory", 150, function()
+	local acc = player:WaitForChild("AccessoryInventoryList")
+	for _, item in pairs(acc:GetChildren()) do
+		if item:IsA("BoolValue") then
+			item.Value = true
+		end
+	end
+end)
+
+local isVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+	isVisible = not isVisible
+	itemButton.Visible = isVisible
+	swordButton.Visible = isVisible
+	accButton.Visible = isVisible
+	toggleButton.Text = isVisible and "🔽" or "▶"
+	mainFrame.Size = isVisible and UDim2.new(0, 230, 0, 200) or UDim2.new(0, 230, 0, 40)
+end)
