@@ -2,10 +2,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
+-- UI Setup
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "FreeItemGui"
 screenGui.ResetOnSpawn = false
 
+-- 🌟 ฟังก์ชันสร้าง UICorner + UIStroke
 local function styleFrame(f)
     local corner = Instance.new("UICorner", f)
     corner.CornerRadius = UDim.new(0, 10)
@@ -16,6 +18,7 @@ local function styleFrame(f)
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 end
 
+-- 🪟 Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 230, 0, 200)
 mainFrame.Position = UDim2.new(0, 30, 0, 30)
@@ -26,17 +29,19 @@ mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 styleFrame(mainFrame)
 
+-- 🧢 Title Bar
 local titleBar = Instance.new("TextLabel")
 titleBar.Size = UDim2.new(1, -35, 0, 35)
 titleBar.Position = UDim2.new(0, 5, 0, 5)
 titleBar.BackgroundTransparency = 1
-titleBar.Text = "Kuyraisus  🔆"
+titleBar.Text = "🎁 Free Item Panel"
 titleBar.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleBar.TextSize = 18
 titleBar.Font = Enum.Font.GothamBold
 titleBar.TextXAlignment = Enum.TextXAlignment.Left
 titleBar.Parent = mainFrame
 
+-- 🔽 Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 30, 0, 30)
 toggleButton.Position = UDim2.new(1, -35, 0, 5)
@@ -48,6 +53,7 @@ toggleButton.TextSize = 16
 toggleButton.Parent = mainFrame
 styleFrame(toggleButton)
 
+-- 🌈 ฟังก์ชันสร้างปุ่มสไตล์สวยๆ
 local function createButton(name, yOffset, callback)
 	local button = Instance.new("TextButton")
 	button.Name = name
@@ -65,6 +71,7 @@ local function createButton(name, yOffset, callback)
 	return button
 end
 
+-- ปุ่ม: Getfree item
 local itemButton = createButton("Getfree item", 50, function()
 	local items = ReplicatedStorage:WaitForChild("Items")
 	for _, tool in pairs(items:GetChildren()) do
@@ -74,6 +81,7 @@ local itemButton = createButton("Getfree item", 50, function()
 	end
 end)
 
+-- ปุ่ม: Getfree Sword
 local swordButton = createButton("Getfree Sword", 100, function()
 	local inv = player:WaitForChild("InventoryList")
 	for _, item in pairs(inv:GetChildren()) do
@@ -83,6 +91,7 @@ local swordButton = createButton("Getfree Sword", 100, function()
 	end
 end)
 
+-- ปุ่ม: Getfree Accessory
 local accButton = createButton("Getfree Accessory", 150, function()
 	local acc = player:WaitForChild("AccessoryInventoryList")
 	for _, item in pairs(acc:GetChildren()) do
@@ -92,6 +101,7 @@ local accButton = createButton("Getfree Accessory", 150, function()
 	end
 end)
 
+-- 👁️ ฟังก์ชันซ่อน/แสดง
 local isVisible = true
 toggleButton.MouseButton1Click:Connect(function()
 	isVisible = not isVisible
