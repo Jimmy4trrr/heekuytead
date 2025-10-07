@@ -1,0 +1,22 @@
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local dropFolder = game:GetService("Workspace").Drop
+local current = 1
+
+while task.wait(1) do
+    if not dropFolder:FindFirstChild(tostring(current)) then
+        current = 1
+    end
+
+    local target = dropFolder:FindFirstChild(tostring(current))
+    if target then
+        hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+    end
+
+    current += 1
+    if current > 7 then
+        current = 1
+    end
+end
