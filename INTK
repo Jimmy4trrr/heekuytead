@@ -1,0 +1,27 @@
+-- 🔆 Kuyraisus AutoKill System 🔆
+-- ยกเว้นโมเดลชื่อเหมือนผู้เล่น
+
+local player = game:GetService("Players").LocalPlayer
+local ws = game:GetService("Workspace")
+
+task.spawn(function()
+	while task.wait(0.3) do -- 🔁 วนตลอดเวลา
+		for _, model in pairs(ws:GetChildren()) do
+			-- ✅ ต้องเป็น Model, มี Humanoid และไม่ใช่ชื่อผู้เล่น
+			if model.ClassName == "Model" and model:FindFirstChild("Humanoid") and model.Name ~= player.Name then
+				local hum = model:FindFirstChild("Humanoid")
+
+				-- ✅ ตรวจเลือดต่ำกว่า 89%
+				if hum.Health > 0 and hum.Health <= (hum.MaxHealth * 0.89) then
+					hum.Health = 0
+				end
+			end
+		end
+	end
+end)
+
+-- 🛡️ ทำให้สคริปต์ไม่หยุดเมื่อเราตาย
+player.CharacterAdded:Connect(function(char)
+	task.wait(1)
+	print("🔄 Kuyraisus Script ยังทำงานต่อหลังรีสปาวน์")
+end)
