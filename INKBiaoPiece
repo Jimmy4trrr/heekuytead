@@ -1,11 +1,19 @@
--- 🔁 วนเช็กตลอดเวลา
+-- ⚙️ ฟังก์ชันเช็กและฆ่ามอน
+local function checkAndKill(folder)
+	for _, mob in pairs(folder:GetChildren()) do
+		if mob:IsA("Model") and mob:FindFirstChild("Humanoid") then
+			local hum = mob.Humanoid
+			if hum.Health / hum.MaxHealth < 0.89 then
+				hum.Health = 0
+			end
+		end
+	end
+end
+
+-- 🔁 วนเช็กทั้ง workspace.All.Mob และ workspace โดยตรง
 while task.wait(0.5) do
-    for _, mob in pairs(workspace.All.Mob:GetChildren()) do
-        if mob:IsA("Model") and mob:FindFirstChild("Humanoid") then
-            local hum = mob.Humanoid
-            if hum.Health / hum.MaxHealth < 0.89 then
-                hum.Health = 0
-            end
-        end
-    end
+	if workspace:FindFirstChild("All") and workspace.All:FindFirstChild("Mob") then
+		checkAndKill(workspace.All.Mob)
+	end
+	checkAndKill(workspace)
 end
