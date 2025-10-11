@@ -1,93 +1,132 @@
--- โหลด Rayfield
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))()
-
--- สร้างหน้าต่าง UI
-local Window = Rayfield:CreateWindow({
-   Name = "KUYRAISUS 🔆",
-   LoadingTitle = "กำลังโหลด UI...",
-   LoadingSubtitle = "โปรดรอสักครู่",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = nil,
-      FileName = "Auto"
-   },
-   Discord = {
-      Enabled = false
-   },
-   KeySystem = false
-})
-
--- สร้าง Tab
-local Tab = Window:CreateTab("Creature List", 4483362458)
-
 -- ⚙️ ตั้งค่าพื้นฐาน
-local player = game.Players.LocalPlayer
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
 local char = player.Character or player.CharacterAdded:Wait()
 local hrp = char:WaitForChild("HumanoidRootPart")
+
 local creaturesFolder = workspace:WaitForChild("BabyCreatures")
 local safeZoneText = workspace:WaitForChild("Environment"):WaitForChild("SafeZone"):WaitForChild("Text")
 
--- 🕹️ ฟังก์ชันวาร์ป
-local function tpTo(pos)
-    hrp.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
-end
+-- 🖌️ ฟังก์ชันสร้าง UI
+local function createUI()
+    if PlayerGui:FindFirstChild("KuyraisusUI") then
+        PlayerGui.KuyraisusUI:Destroy()
+    end
 
--- 🔹 เก็บปุ่มทั้งหมด
-local Buttons = {}
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "KuyraisusUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = PlayerGui
 
--- 🔹 ฟังก์ชันสร้างปุ่มมอน
-local function createButton(model)
-    local btn = Tab:CreateButton({
-        Name = model.Name,
-        Callback = function()
+    -- 🗂️ Main Frame
+    local frame = Instance.new("Frame", screenGui)
+    frame.Size = UDim2.new(0, 250, 0, 350)
+    frame.Position = UDim2.new(0, 30, 0.5, -175)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BorderSizePixel = 0
+    frame.ClipsDescendants = true
+    frame.Active = true  -- ต้องเปิดเพื่อให้ลากได้
+    frame.Draggable = true
+    local uicorner = Instance.new("UICorner", frame)
+    uicorner.CornerRadius = UDim.new(0, 15)
+
+    -- Title
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextScaled = true
+    title.Text = "KUYRAISUS 🔆"
+    local titleCorner = Instance.new("UICorner", title)
+    titleCorner.CornerRadius = UDim.new(0, 15)
+
+    -- Scrolling Frame
+    local scrollingFrame = Instance.new("ScrollingFrame", frame)
+    scrollingFrame.Size = UDim2.new(1, 0, 1, -90) -- เว้นที่ด้านล่างสำหรับปุ่ม Refresh
+    scrollingFrame.Position = UDim2.new(0, 0, 0, 40)
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollingFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    scrollingFrame.BorderSizePixel = 0
+    scrollingFrame.ScrollBarThickness = 6
+    local scrollCorner = Instance.new("UICorner", scrollingFrame)
+    scrollCorner.CornerRadius = UDim.new(0, 12)
+
+    -- ฟังก์ชันวาร์ป
+    local function tpTo(pos)
+        if hrp then hrp.CFrame = CFrame.new(pos + Vector3.new(0,3,0)) end
+    end
+
+    -- ฟังก์ชันสร้างปุ่มมอน
+    local function createButton(model)
+        local btn = Instance.new("TextButton", scrollingFrame)
+        btn.Size = UDim2.new(1, -20, 0, 35)
+        btn.Position = UDim2.new(0, 10, 0, #scrollingFrame:GetChildren() * 40) -- spacing เท่ากัน
+        btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Text = model.Name
+        btn.Font = Enum.Font.Gotham
+        btn.TextScaled = true
+        local btnCorner = Instance.new("UICorner", btn)
+        btnCorner.CornerRadius = UDim.new(0, 12)
+
+        -- คลิกวาร์ป + กด ProximityPrompt
+        btn.MouseButton1Click:Connect(function()
             local hrpTarget = model:FindFirstChild("HumanoidRootPart")
             if hrpTarget then
                 local prompt = hrpTarget:FindFirstChildOfClass("ProximityPrompt")
                 if prompt then
                     tpTo(hrpTarget.Position + Vector3.new(0,6,0))
                     task.wait(0.4)
-                    fireproximityprompt(prompt, 1, false)
+                    fireproximityprompt(prompt,1,false)
                     task.wait(prompt.HoldDuration + 0.2)
-                    tpTo(safeZoneText.Position + Vector3.new(0,3,0))
-                else
-                    warn("❌ ไม่มี ProximityPrompt ใน "..model.Name)
+                    tpTo(safeZoneText.Position)
                 end
-            else
-                warn("❌ ไม่มี HumanoidRootPart ใน "..model.Name)
             end
+        end)
+        return btn
+    end
+
+    -- รีเฟชปุ่มมอน
+    local function refreshList()
+        for _, v in pairs(scrollingFrame:GetChildren()) do
+            if v:IsA("TextButton") then v:Destroy() end
         end
-    })
-    return btn
+
+        local models = creaturesFolder:GetChildren()
+        table.sort(models, function(a,b) return a.Name:lower() < b.Name:lower() end)
+        local y = 0
+        for _, m in pairs(models) do
+            local btn = createButton(m)
+            btn.Position = UDim2.new(0,10,0,y)
+            y = y + 40
+        end
+        scrollingFrame.CanvasSize = UDim2.new(0,0,0,y)
+    end
+
+    -- ปุ่ม Refresh (ด้านล่าง)
+    local refreshBtn = Instance.new("TextButton", frame)
+    refreshBtn.Size = UDim2.new(1, -20, 0, 35)
+    refreshBtn.Position = UDim2.new(0, 10, 1, -45)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    refreshBtn.Font = Enum.Font.Gotham
+    refreshBtn.TextScaled = true
+    refreshBtn.Text = "🔄 Refresh มอน"
+    local refreshCorner = Instance.new("UICorner", refreshBtn)
+    refreshCorner.CornerRadius = UDim.new(0, 12)
+    refreshBtn.MouseButton1Click:Connect(refreshList)
+
+    refreshList()
 end
 
--- 🔹 อัปเดตรายชื่อปุ่มทั้งหมด (เรียงชื่อ A-Z)
-local function refreshList()
-    -- ลบปุ่มเก่า
-    for _, btn in pairs(Buttons) do
-        pcall(function() btn:Remove() end)
-    end
-    Buttons = {}
+-- เรียกสร้าง UI
+createUI()
 
-    -- ดึงมอนทั้งหมดแล้วเรียงชื่อ A-Z
-    local models = creaturesFolder:GetChildren()
-    table.sort(models, function(a,b)
-        return a.Name:lower() < b.Name:lower()
-    end)
-
-    -- สร้างปุ่มตามลำดับ
-    for _, model in pairs(models) do
-        local btn = createButton(model)
-        table.insert(Buttons, btn)
-    end
-end
-
--- 🔹 ปุ่ม Refresh
-Tab:CreateButton({
-    Name = "🔄 Refresh",
-    Callback = function()
-        refreshList()
-    end
-})
-
--- ▶️ เริ่มต้น
-refreshList()
+-- รักษา UI ไม่หายหลังตาย
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    createUI()
+end)
