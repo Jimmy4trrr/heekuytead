@@ -1,0 +1,93 @@
+-- โหลด Rayfield
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))()
+
+-- สร้างหน้าต่าง UI
+local Window = Rayfield:CreateWindow({
+   Name = "KUYRAISUS 🔆",
+   LoadingTitle = "กำลังโหลด UI...",
+   LoadingSubtitle = "โปรดรอสักครู่",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Auto"
+   },
+   Discord = {
+      Enabled = false
+   },
+   KeySystem = false
+})
+
+-- สร้าง Tab
+local Tab = Window:CreateTab("Creature List", 4483362458)
+
+-- ⚙️ ตั้งค่าพื้นฐาน
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local creaturesFolder = workspace:WaitForChild("BabyCreatures")
+local safeZoneText = workspace:WaitForChild("Environment"):WaitForChild("SafeZone"):WaitForChild("Text")
+
+-- 🕹️ ฟังก์ชันวาร์ป
+local function tpTo(pos)
+    hrp.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
+end
+
+-- 🔹 เก็บปุ่มทั้งหมด
+local Buttons = {}
+
+-- 🔹 ฟังก์ชันสร้างปุ่มมอน
+local function createButton(model)
+    local btn = Tab:CreateButton({
+        Name = model.Name,
+        Callback = function()
+            local hrpTarget = model:FindFirstChild("HumanoidRootPart")
+            if hrpTarget then
+                local prompt = hrpTarget:FindFirstChildOfClass("ProximityPrompt")
+                if prompt then
+                    tpTo(hrpTarget.Position + Vector3.new(0,6,0))
+                    task.wait(0.4)
+                    fireproximityprompt(prompt, 1, false)
+                    task.wait(prompt.HoldDuration + 0.2)
+                    tpTo(safeZoneText.Position + Vector3.new(0,3,0))
+                else
+                    warn("❌ ไม่มี ProximityPrompt ใน "..model.Name)
+                end
+            else
+                warn("❌ ไม่มี HumanoidRootPart ใน "..model.Name)
+            end
+        end
+    })
+    return btn
+end
+
+-- 🔹 อัปเดตรายชื่อปุ่มทั้งหมด (เรียงชื่อ A-Z)
+local function refreshList()
+    -- ลบปุ่มเก่า
+    for _, btn in pairs(Buttons) do
+        pcall(function() btn:Remove() end)
+    end
+    Buttons = {}
+
+    -- ดึงมอนทั้งหมดแล้วเรียงชื่อ A-Z
+    local models = creaturesFolder:GetChildren()
+    table.sort(models, function(a,b)
+        return a.Name:lower() < b.Name:lower()
+    end)
+
+    -- สร้างปุ่มตามลำดับ
+    for _, model in pairs(models) do
+        local btn = createButton(model)
+        table.insert(Buttons, btn)
+    end
+end
+
+-- 🔹 ปุ่ม Refresh
+Tab:CreateButton({
+    Name = "🔄 Refresh",
+    Callback = function()
+        refreshList()
+    end
+})
+
+-- ▶️ เริ่มต้น
+refreshList()
