@@ -1,0 +1,94 @@
+-- 🌟 ตั้งค่าพื้นฐาน
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local backpack = player:WaitForChild("Backpack")
+local workspace = game:GetService("Workspace")
+
+-- 🌈 GUI สวย ๆ
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+
+local function createButton(name, yPos, defaultState)
+	local btn = Instance.new("TextButton", screenGui)
+	btn.Size = UDim2.new(0, 180, 0, 45)
+	btn.Position = UDim2.new(0, 20, 0, yPos)
+	btn.Text = name .. ": " .. (defaultState and "ON" or "OFF")
+	btn.TextScaled = true
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.BackgroundColor3 = defaultState and Color3.fromRGB(50,200,50) or Color3.fromRGB(200,50,50)
+	return btn
+end
+
+-- ปุ่ม AutoFarm & AutoClick
+getgenv().AutoFarm = true
+getgenv().AutoClick = true
+
+local btnFarm = createButton("AutoFarm", 80, getgenv().AutoFarm)
+local btnClick = createButton("AutoClick", 135, getgenv().AutoClick)
+
+-- ปุ่มกดเปิด/ปิด
+btnFarm.MouseButton1Click:Connect(function()
+	getgenv().AutoFarm = not getgenv().AutoFarm
+	btnFarm.Text = "AutoFarm: " .. (getgenv().AutoFarm and "ON" or "OFF")
+	btnFarm.BackgroundColor3 = getgenv().AutoFarm and Color3.fromRGB(50,200,50) or Color3.fromRGB(200,50,50)
+end)
+
+btnClick.MouseButton1Click:Connect(function()
+	getgenv().AutoClick = not getgenv().AutoClick
+	btnClick.Text = "AutoClick: " .. (getgenv().AutoClick and "ON" or "OFF")
+	btnClick.BackgroundColor3 = getgenv().AutoClick and Color3.fromRGB(50,200,50) or Color3.fromRGB(200,50,50)
+end)
+
+-- 🧠 ฟังก์ชันหา Golem
+local function getNearestGolem()
+	local nearest, dist = nil, math.huge
+	for _, mob in ipairs(workspace.BadNPCs:GetChildren()) do
+		if mob.Name == "Golem" and mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+			local d = (mob.HumanoidRootPart.Position - hrp.Position).Magnitude
+			if d < dist then
+				nearest = mob
+				dist = d
+			end
+		end
+	end
+	return nearest
+end
+
+-- ⚔️ ใส่ Combat อัตโนมัติ
+task.spawn(function()
+	while task.wait(0.5) do
+		local Leo Fist = backpack:FindFirstChild("Leo Fist")
+		if Leo Fist then
+			Leo Fist.Parent = char
+		end
+	end
+end)
+
+-- 💥 AutoFarm + AutoClick หลัก
+task.spawn(function()
+	while task.wait(0.1) do
+		if getgenv().AutoFarm then
+			local target = getNearestGolem()
+			if target and target:FindFirstChild("HumanoidRootPart") then
+				-- วาร์ปไปหามอน + ลอยค้างเหนือหัวมอน
+				local pos = target.HumanoidRootPart.Position + Vector3.new(0, 6, 0)
+				hrp.CFrame = CFrame.new(pos)
+			end
+		end
+
+		if getgenv().AutoClick then
+			local tool = char:FindFirstChild("Leo Fist")
+			if tool then
+				pcall(function()
+					if tool:FindFirstChild("Activate") then
+						tool:Activate()
+					elseif tool:FindFirstChild("RemoteEvent") then
+						tool.RemoteEvent:FireServer()
+					else
+						tool:Activate()
+					end
+				end)
+			end
+		end
+	end
+end)
