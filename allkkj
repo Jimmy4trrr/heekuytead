@@ -1,0 +1,103 @@
+-- Load Rayfield UI
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- 🧠 Main Window
+local Window = Rayfield:CreateWindow({
+    Name = "KUYRAISUS 🔆| FREE(NO KEY)",
+    LoadingTitle = "KUYRAISUS 🔆",
+    LoadingSubtitle = "BY KUYRAISUS",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "KuyraisusConfig",
+        FileName = "KuyraisusUI"
+    },
+    KeySystem = false
+})
+
+-- ⚙️ Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ⚡ Functions
+local function SetTechnique(technique)
+    local arg1, arg2, arg3, arg4 = technique, technique, 1, 0.2
+    ReplicatedStorage:WaitForChild("SetTechnique"):FireServer(arg1, arg2, arg3, arg4)
+    Rayfield:Notify({
+        Title = "Technique Set!",
+        Content = "✅ Technique changed to: " .. technique,
+        Duration = 3
+    })
+end
+
+local function SetRace(race)
+    local arg1, arg2, arg3, arg4 = race, race, 1, 0.65
+    ReplicatedStorage:WaitForChild("SetRace"):FireServer(arg1, arg2, arg3, arg4)
+    Rayfield:Notify({
+        Title = "Race Set!",
+        Content = "🧬 Race changed to: " .. race,
+        Duration = 3
+    })
+end
+
+local function SetClan(clan)
+    local arg1, arg2, arg3, arg4 = "None", clan, 1, 0.35
+    ReplicatedStorage:WaitForChild("SetClan"):FireServer(arg1, arg2, arg3, arg4)
+    Rayfield:Notify({
+        Title = "Clan Set!",
+        Content = "👑 Clan changed to: " .. clan,
+        Duration = 3
+    })
+end
+
+-- 📜 Data Lists (A–Z)
+local TechniqueList = {
+    "Anti Gravity", "Blast Energy", "Blood Manipulation", "Boogie Woogie", "Comedian",
+    "Curse Manipulation", "Cursed Speech", "Deadly Sentencing", "Disaster Flames",
+    "Disaster Tides", "Divergent Fist", "Heavenly Restriction", "Ice Formation",
+    "Idle Transfiguration", "Infinity", "Jackpot", "Moon Dregs", "Projection",
+    "Ratio", "Rika", "Sound Amplification", "Star Rage", "Straw Doll", "Ten Shadows"
+}
+table.sort(TechniqueList)
+
+local RaceList = {
+    "Angel", "Cursed Spirit", "Death Paiting", "Fallen Angel", "Human"
+}
+table.sort(RaceList)
+
+local ClanList = {
+    "Fushiguro", "Geto", "Gojo", "Kamo", "Nanami",
+    "Okkotsu", "Rejected Zenin", "Ryomen", "Todo", "Zenin"
+}
+table.sort(ClanList)
+
+-- 🔮 TAB 1: Technique (Button Selector)
+local TechniqueTab = Window:CreateTab("Technique 🔮", 4483362458)
+for _, tech in ipairs(TechniqueList) do
+    TechniqueTab:CreateButton({
+        Name = "Set Technique: " .. tech,
+        Callback = function()
+            SetTechnique(tech)
+        end
+    })
+end
+
+-- 🧬 TAB 2: Race (Button Selector)
+local RaceTab = Window:CreateTab("Race 🧬", 4483362458)
+for _, race in ipairs(RaceList) do
+    RaceTab:CreateButton({
+        Name = "Set Race: " .. race,
+        Callback = function()
+            SetRace(race)
+        end
+    })
+end
+
+-- 👑 TAB 3: Clan (Button Selector)
+local ClanTab = Window:CreateTab("Clan 👑", 4483362458)
+for _, clan in ipairs(ClanList) do
+    ClanTab:CreateButton({
+        Name = "Set Clan: " .. clan,
+        Callback = function()
+            SetClan(clan)
+        end
+    })
+end
