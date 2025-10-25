@@ -1,0 +1,58 @@
+--// โหลด Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+--// สร้างหน้าต่างหลัก
+local Window = Rayfield:CreateWindow({
+	Name = "Chest Auto Collector 🔆",
+	LoadingTitle = "Kuyraisus Hub",
+	LoadingSubtitle = "By นายท่าน",
+	ConfigurationSaving = {Enabled = true, FolderName = "KuyraisusHub"}
+})
+
+--// สร้างแท็บ
+local Tab = Window:CreateTab("AutoFarm")
+
+--// ตัวแปรสถานะ
+local ChestFarm = false
+
+--// ปุ่มสวิตช์เปิดปิดระบบ
+local Toggle = Tab:CreateToggle({
+	Name = "Auto Chest Collect (Teleport)",
+	CurrentValue = false,
+	Flag = "AutoChest",
+	Callback = function(Value)
+		ChestFarm = Value
+
+		if ChestFarm then
+			task.spawn(function()
+				local player = game.Players.LocalPlayer
+				local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
+				while ChestFarm do
+					local chestFolder = workspace:FindFirstChild("chestSpawns")
+					if chestFolder and chestFolder:FindFirstChild("Folder") then
+						local chests = chestFolder.Folder:GetChildren()
+						for _, chest in ipairs(chests) do
+							if not ChestFarm then break end
+							
+							local mainPart = chest:FindFirstChild("mainPart")
+							if mainPart and mainPart:FindFirstChild("ProximityPrompt") then
+								-- วาร์ปไปยังกล่อง
+								root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+								if root then
+									root.CFrame = mainPart.CFrame + Vector3.new(0, 3, 0) -- ลอยเหนือกล่องเล็กน้อย
+									task.wait(0.3)
+									pcall(function()
+										fireproximityprompt(mainPart.ProximityPrompt)
+									end)
+									task.wait(0.5)
+								end
+							end
+						end
+					end
+					task.wait(2)
+				end
+			end)
+		end
+	end,
+})
