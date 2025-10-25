@@ -1,7 +1,7 @@
---// โหลด Rayfield
+--// โหลด Rayfield UI
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
---// สร้างหน้าต่างหลัก
+--// หน้าต่างหลัก
 local Window = Rayfield:CreateWindow({
 	Name = "Chest Auto Collector 🔆",
 	LoadingTitle = "Kuyraisus Hub",
@@ -14,43 +14,92 @@ local Tab = Window:CreateTab("AutoFarm")
 
 --// ตัวแปรสถานะ
 local ChestFarm = false
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
---// ปุ่มสวิตช์เปิดปิดระบบ
+--// ฟังก์ชัน hop เซิร์ฟเวอร์
+local function ServerHop()
+	local gameId = game.PlaceId
+	local servers = {}
+	local cursor = ""
+	
+	-- ดึงรายการเซิร์ฟเวอร์
+	local success, result = pcall(function()
+		return game:HttpGet("https://games.roblox.com/v1/games/"..gameId.."/servers/Public?sortOrder=Asc&limit=100" .. (cursor ~= "" and "&cursor="..cursor or ""))
+	end)
+	
+	if success and result then
+		local data = HttpService:JSONDecode(result)
+		if data and data.data then
+			for _, server in ipairs(data.data) do
+				if type(server) == "table" and server.playing < server.maxPlayers then
+					table.insert(servers, server.id)
+				end
+			end
+		end
+	end
+	
+	-- วาร์ปไปเซิร์ฟเวอร์ใหม่
+	if #servers > 0 then
+		local randomServer = servers[math.random(1, #servers)]
+		TeleportService:TeleportToPlaceInstance(gameId, randomServer, LocalPlayer)
+	else
+		Rayfield:Notify({
+			Title = "⚠️ Server Hop Failed",
+			Content = "ไม่พบเซิร์ฟเวอร์ที่ว่าง!",
+			Duration = 5
+		})
+	end
+end
+
+--// Toggle หลัก
 local Toggle = Tab:CreateToggle({
-	Name = "Auto Chest Collect (Teleport)",
+	Name = "Auto Chest Collect (with Server Hop)",
 	CurrentValue = false,
-	Flag = "AutoChest",
+	Flag = "AutoChestFarm",
 	Callback = function(Value)
 		ChestFarm = Value
 
 		if ChestFarm then
 			task.spawn(function()
-				local player = game.Players.LocalPlayer
-				local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-
 				while ChestFarm do
 					local chestFolder = workspace:FindFirstChild("chestSpawns")
+					local foundChest = false
+
 					if chestFolder and chestFolder:FindFirstChild("Folder") then
-						local chests = chestFolder.Folder:GetChildren()
-						for _, chest in ipairs(chests) do
+						for _, chest in ipairs(chestFolder.Folder:GetChildren()) do
 							if not ChestFarm then break end
 							
 							local mainPart = chest:FindFirstChild("mainPart")
 							if mainPart and mainPart:FindFirstChild("ProximityPrompt") then
-								-- วาร์ปไปยังกล่อง
-								root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+								foundChest = true
+								local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 								if root then
-									root.CFrame = mainPart.CFrame + Vector3.new(0, 3, 0) -- ลอยเหนือกล่องเล็กน้อย
-									task.wait(0.3)
+									root.CFrame = mainPart.CFrame + Vector3.new(0, 3, 0)
+									task.wait(0.4)
 									pcall(function()
 										fireproximityprompt(mainPart.ProximityPrompt)
 									end)
-									task.wait(0.5)
+									task.wait(0.8)
 								end
 							end
 						end
 					end
-					task.wait(2)
+
+					-- ถ้าไม่มี chest เจอในรอบนี้ → hop server ใหม่
+					if not foundChest then
+						Rayfield:Notify({
+							Title = "🌍 Server Hop",
+							Content = "ไม่พบกล่องในเซิร์ฟเวอร์นี้ กำลังเปลี่ยน...",
+							Duration = 3
+						})
+						ServerHop()
+						break -- ออกจากลูปเดิม
+					end
+
+					task.wait(3)
 				end
 			end)
 		end
