@@ -1,0 +1,218 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "🔆 Kuyraisus | Bizblox Adventure",
+    LoadingTitle = "Kuyraisus",
+    LoadingSubtitle = "by Kuyraisus",
+    ConfigurationSaving = {Enabled = true, FolderName = "KuyraisusConfig", FileName = "FullAutoSettings"}
+})
+
+local Tab_Enemy = Window:CreateTab("⚔️ All Enemy", 4483362458)
+local Tab_Pumpkin = Window:CreateTab("🎃 instant Pumpkin Farm", 4483362458)
+local Tab_Movement = Window:CreateTab("🏃 Movement", 4483362458)
+
+local Player = game.Players.LocalPlayer
+local EnemiesFolder = workspace:WaitForChild("Enemies")
+local EnabledKill, EnabledPumpkin, NoclipEnabled = false, false, false
+local InfJumpEnabled, SpeedValue, JumpValue = false, 50, 100
+local HopEnabled, HopTime = false, 80 -- 80 วินาที
+
+----------------------------------------
+-- 🔪 Auto Kill HP < 95%
+----------------------------------------
+Tab_Enemy:CreateToggle({
+    Name = "instant kill (HP < 95%)",
+    CurrentValue = false,
+    Flag = "AutoKill95",
+    Callback = function(Value) EnabledKill = Value end
+})
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if EnabledKill then
+            for _, model in pairs(EnemiesFolder:GetChildren()) do
+                if model:IsA("Model") and model:FindFirstChildOfClass("Humanoid") then
+                    local humanoid = model:FindFirstChildOfClass("Humanoid")
+                    if humanoid.Health < humanoid.MaxHealth * 0.99 then
+                        humanoid.Health = 0
+                    end
+                end
+            end
+        end
+    end
+end)
+
+----------------------------------------
+-- 🎃 Noclip Loop
+----------------------------------------
+local function noclipLoop()
+    while NoclipEnabled do
+        task.wait(0.1)
+        local char = Player.Character
+        if char then
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end
+
+----------------------------------------
+-- 🎃 AutoFarm Pumpkin + Remote + Noclip
+----------------------------------------
+Tab_Pumpkin:CreateToggle({
+    Name = "instant AutoFarm Pumpkin",
+    CurrentValue = false,
+    Flag = "instant AutoFarmPumpkin",
+    Callback = function(Value)
+        EnabledPumpkin = Value
+        NoclipEnabled = Value
+        if NoclipEnabled then
+            task.spawn(noclipLoop)
+        end
+    end
+})
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if not EnabledPumpkin then
+            task.wait(0.1)
+            continue
+        end
+
+        pcall(function()
+            for _, pumpkinObj in pairs(workspace.PumpkinGame:GetChildren()) do
+                if not EnabledPumpkin then break end
+
+                local prompt = pumpkinObj:FindFirstChildOfClass("ProximityPrompt")
+                if prompt then
+                    prompt.HoldDuration = 0
+
+                    local char = Player.Character or Player.CharacterAdded:Wait()
+                    local hrp = char:WaitForChild("HumanoidRootPart")
+
+                    hrp.CFrame = pumpkinObj.CFrame + Vector3.new(0,3,0)
+                    task.wait(0.75)
+                    fireproximityprompt(prompt)
+
+                    task.wait(0.1)
+
+                    local args = {[1] = "ReimiHalloween"}
+                    local remote = game:GetService("ReplicatedStorage"):WaitForChild("ReplicatedStorage_Package"):WaitForChild("Remote"):WaitForChild("NPCDialog")
+                    remote:InvokeServer(unpack(args))
+                end
+            end
+        end)
+    end
+end)
+
+----------------------------------------
+-- 🏃 Movement Tab: Infinite Jump + Speed + JumpPower
+----------------------------------------
+-- Infinite Jump Toggle
+Tab_Movement:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfJump",
+    Callback = function(Value)
+        InfJumpEnabled = Value
+    end
+})
+
+-- Walk Speed Slider
+Tab_Movement:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 500},
+    Increment = 1,
+    CurrentValue = 50,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        SpeedValue = Value
+        local hum = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = SpeedValue end
+    end
+})
+
+-- Jump Power Slider
+Tab_Movement:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 500},
+    Increment = 1,
+    CurrentValue = 100,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        JumpValue = Value
+        local hum = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.JumpPower = JumpValue end
+    end
+})
+
+-- Persistent Loop for Speed/Jump & Infinite Jump
+local uis = game:GetService("UserInputService")
+Player.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+    task.spawn(function()
+        while task.wait(0.1) do
+            if hum then
+                hum.WalkSpeed = SpeedValue
+                hum.JumpPower = JumpValue
+            end
+        end
+    end)
+end)
+
+-- Infinite Jump Event
+uis.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if InfJumpEnabled and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+        local hum = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+----------------------------------------
+-- 🌀 Auto Hop if no Pumpkin
+----------------------------------------
+Tab_Pumpkin:CreateToggle({
+    Name = "Auto Hop if Pumpkin not found",
+    CurrentValue = false,
+    Flag = "AutoHop",
+    Callback = function(Value)
+        HopEnabled = Value
+    end
+})
+
+task.spawn(function()
+    local lastFound = tick()
+    while true do
+        task.wait(1)
+        if not HopEnabled then continue end
+
+        local char = workspace:FindFirstChild("PlayerCharacter")
+        if not char then continue end
+
+        local hamster = char:FindFirstChild("Hamter0047x14")
+        if not hamster then continue end
+
+        local hasPumpkin = false
+        for _, obj in pairs(hamster:GetChildren()) do
+            if obj.Name == "Pumpkin" then
+                hasPumpkin = true
+                lastFound = tick()
+                break
+            end
+        end
+
+        if not hasPumpkin and tick() - lastFound >= HopTime then
+            local TeleportService = game:GetService("TeleportService")
+            local PlaceId = game.PlaceId
+            TeleportService:Teleport(PlaceId, Player)
+            lastFound = tick()
+        end
+    end
+end)
