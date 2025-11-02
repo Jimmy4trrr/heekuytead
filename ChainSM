@@ -1,0 +1,176 @@
+-- 🔆 Kuyraisus Hub (Rayfield Version)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+	Name = "Kuyraisus 🔆",
+	LoadingTitle = "Kuyraisus Hub",
+	LoadingSubtitle = "by Kuyraisus",
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "KuyraisusHub",
+		FileName = "Settings"
+	},
+	KeySystem = false
+})
+
+-- ⚙️ Services
+local Players = game:GetService("Players")
+local living = workspace:WaitForChild("Living")
+local TweenService = game:GetService("TweenService")
+
+----------------------------------------------------------------------
+-- ⚔️ TAB 1: Instant Kill Raid
+----------------------------------------------------------------------
+local raidTab = Window:CreateTab("⚔️ Instant Kill Raid")
+
+raidTab:CreateButton({
+	Name = "💀 Instant Kill Raid (Set all monsters' HP to 0%)",
+	Callback = function()
+		local Players = game:GetService("Players") 
+		local living = workspace:WaitForChild("Living")
+
+		local function checkHealth(model)
+			if model.ClassName == "Model" then
+				local hum = model:FindFirstChildOfClass("Humanoid")
+				if hum then
+					if Players:GetPlayerFromCharacter(model) then
+						return
+					end
+					
+					hum:GetPropertyChangedSignal("Health"):Connect(function()
+						hum.Health = 0
+					end)
+					hum.Health = 0
+				end
+			end
+		end
+
+		for _, model in pairs(living:GetChildren()) do
+			checkHealth(model)
+		end
+
+		living.ChildAdded:Connect(function(child)
+			task.wait(0.2)
+			checkHealth(child)
+		end)
+
+		Rayfield:Notify({
+			Title = "💀 Instant Kill Raid Activated",
+			Content = "All monsters will instantly die when spawned or damaged",
+			Duration = 4
+		})
+	end
+})
+
+----------------------------------------------------------------------
+-- 🌾 TAB 2: Farm
+----------------------------------------------------------------------
+local farmTab = Window:CreateTab("🌾 Farm")
+
+farmTab:CreateButton({
+	Name = "☠️ Stun Mon",
+	Callback = function()
+		local Players = game:GetService("Players")
+		local living = workspace:WaitForChild("Living")
+
+		local function checkHealth(model)
+			if model.ClassName == "Model" then
+				local hum = model:FindFirstChildOfClass("Humanoid")
+				if hum and not Players:GetPlayerFromCharacter(model) then
+					hum:GetPropertyChangedSignal("Health"):Connect(function()
+						if hum.Health < (hum.MaxHealth * 0.99) then
+							hum.Health = 0
+						end
+					end)
+					if hum.Health < (hum.MaxHealth * 0.99) then
+						hum.Health = 0
+					end
+				end
+			end
+		end
+
+		for _, model in pairs(living:GetChildren()) do
+			checkHealth(model)
+		end
+
+		living.ChildAdded:Connect(function(child)
+			task.wait(0.2)
+			checkHealth(child)
+		end)
+
+		Rayfield:Notify({
+			Title = "☠️ Stun mon Activated",
+			Content = "Stun mon",
+			Duration = 3
+		})
+	end
+})
+
+-- 💗 Auto Farm Devil Heart
+farmTab:CreateToggle({
+	Name = "💗 Auto Farm Devil Heart",
+	CurrentValue = false,
+	Flag = "AutoDevilHeart",
+	Callback = function(State)
+		getgenv().AutoHeart = State
+		local devilESP = {}
+		
+		local function clearESP()
+			for _, h in pairs(devilESP) do
+				if h and h.Parent then h:Destroy() end
+			end
+			devilESP = {}
+		end
+
+		local function updateESP(part)
+			local highlight = Instance.new("Highlight")
+			highlight.Adornee = part
+			highlight.FillColor = Color3.fromRGB(255, 0, 0)
+			highlight.FillTransparency = 0.5
+			highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+			highlight.OutlineTransparency = 0
+			highlight.Parent = part
+			table.insert(devilESP, highlight)
+		end
+
+		local function moveToTarget(targetPart)
+			local plr = game.Players.LocalPlayer
+			local char = plr.Character
+			if not (char and char:FindFirstChild("HumanoidRootPart")) then return end
+
+			local hrp = char.HumanoidRootPart
+			local distance = (hrp.Position - targetPart.Position).Magnitude
+			local tweenTime = math.clamp(distance / 60, 0.5, 5)
+			local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			local goal = {CFrame = targetPart.CFrame * CFrame.new(0, 5, 0)}
+
+			local tween = TweenService:Create(hrp, tweenInfo, goal)
+			tween:Play()
+			tween.Completed:Wait()
+
+			if targetPart:FindFirstChild("ProximityPrompt") then
+				fireproximityprompt(targetPart.ProximityPrompt)
+			end
+		end
+
+		task.spawn(function()
+			while getgenv().AutoHeart do
+				local found = false
+				for _, v in pairs(workspace:GetDescendants()) do
+					if v:IsA("MeshPart") and v.MeshId == "rbxassetid://12346512976" then
+						found = true
+						updateESP(v)
+						Rayfield:Notify({
+							Title = "💗 Devil Heart Found!",
+							Content = "Moving to collect it...",
+							Duration = 2
+						})
+						moveToTarget(v)
+					end
+				end
+				if not found then clearESP() end
+				task.wait(1)
+			end
+			clearESP()
+		end)
+	end
+})
