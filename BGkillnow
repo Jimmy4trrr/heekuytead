@@ -1,31 +1,12 @@
--- 💀 ระบบตรวจจับมอน + ฆ่าทันทีถ้าเลือดต่ำกว่า 90%
-local folder = workspace:WaitForChild("BadNPCs")
+local badNPCs = workspace:WaitForChild("BadNPCs")
 
--- 🔁 ฟังก์ชันตรวจมอนแต่ละตัว
-local function checkNPC(npc)
-	if npc:IsA("Model") and npc:FindFirstChild("Humanoid") then
-		local hum = npc.Humanoid
-
-		-- 🔄 ตรวจเลือดตลอดเวลา จนกว่ามอนจะตายหรือถูกลบ
-		task.spawn(function()
-			while hum and hum.Parent do
-				if hum.Health < hum.MaxHealth * 0.88 then
-					hum.Health = 0
-					break -- ฆ่าแล้วก็ออกจากลูปตัวนี้
-				end
-				task.wait(0.3)
+while task.wait(0.2) do -- ตรวจทุก 1 วินาที
+	for _, model in pairs(badNPCs:GetChildren()) do
+		if model.ClassName == "Model" then
+			local hum = model:FindFirstChildOfClass("Humanoid")
+			if hum and hum.Health < (hum.MaxHealth * 0.85) then
+				hum.Health = 0
 			end
-		end)
+		end
 	end
 end
-
--- 🔎 ตรวจมอนที่มีอยู่ตอนเริ่ม
-for _, npc in pairs(folder:GetChildren()) do
-	checkNPC(npc)
-end
-
--- ⚡ ตรวจมอนที่เกิดใหม่ (respawn)
-folder.ChildAdded:Connect(function(newNPC)
-	task.wait(0.2) -- รอให้มอนโหลดส่วนต่างๆให้ครบก่อน
-	checkNPC(newNPC)
-end)
