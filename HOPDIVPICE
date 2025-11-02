@@ -1,0 +1,72 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local PlaceId = game.PlaceId -- hop เซิฟไปที่เซิฟปัจจุบัน
+
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = Character:WaitForChild("HumanoidRootPart")
+
+-- โฟลเดอร์ใน workspace
+local ItemsFolder = workspace:WaitForChild("Extra"):WaitForChild("Items")
+local EffectsFolder = workspace:WaitForChild("Extra"):WaitForChild("Effects")
+local ChestsFolder = workspace:WaitForChild("Extra"):WaitForChild("Chests")
+
+-- เปิดทุกหมวด
+local AutoCollectItem = true
+local AutoCollectEffects = true
+local AutoCollectChests = true
+
+-- ฟังก์ชันวาปไปเก็บ
+local function collectObject(obj)
+    if obj:IsA("Model") and obj:FindFirstChildOfClass("ProximityPrompt") then
+        local targetPos = obj.PrimaryPart and obj.PrimaryPart.Position or obj:GetModelCFrame().Position
+        HRP.CFrame = CFrame.new(targetPos + Vector3.new(0,3,0))
+        local prompt = obj:FindFirstChildOfClass("ProximityPrompt")
+        if prompt then
+            prompt:InputHoldBegin(Enum.UserInputType.Keyboard)
+            task.wait(0.1)
+            prompt:InputHoldEnd(Enum.UserInputType.Keyboard)
+        end
+        return true
+    end
+    return false
+end
+
+-- ฟังก์ชัน Hop เซิฟ
+local function hopServer()
+    print("No items found, hopping server...")
+    TeleportService:Teleport(PlaceId, LocalPlayer)
+end
+
+-- loop ตรวจสอบตลอดเวลา
+while true do
+    local foundSomething = false
+
+    if AutoCollectItem then
+        for _, item in ipairs(ItemsFolder:GetChildren()) do
+            if collectObject(item) then foundSomething = true end
+        end
+    end
+
+    if AutoCollectEffects then
+        for _, effect in ipairs(EffectsFolder:GetChildren()) do
+            if collectObject(effect) then foundSomething = true end
+        end
+    end
+
+    if AutoCollectChests then
+        for _, chest in ipairs(ChestsFolder:GetChildren()) do
+            if collectObject(chest) then foundSomething = true end
+        end
+    end
+
+    -- ถ้าไม่เจออะไร hop เซิฟ
+    if not foundSomething then
+        hopServer()
+        break -- หยุด loop เพราะกำลัง teleport
+    end
+
+    task.wait(0.5)
+end
