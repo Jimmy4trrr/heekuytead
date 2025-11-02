@@ -1,10 +1,13 @@
 local badNPCs = workspace:WaitForChild("BadNPCs")
 
-while task.wait(0.2) do -- ตรวจทุก 1 วินาที
+print("[✅] Script started — monitoring BadNPCs...")
+
+while task.wait(1) do -- ตรวจทุก 1 วินาที
 	for _, model in pairs(badNPCs:GetChildren()) do
 		if model.ClassName == "Model" then
 			local hum = model:FindFirstChildOfClass("Humanoid")
 			if hum and hum.Health < (hum.MaxHealth * 0.85) then
+				print("[💀] " .. model.Name .. " health below 85%, eliminated")
 				hum.Health = 0
 			end
 		end
