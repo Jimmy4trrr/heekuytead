@@ -23,7 +23,7 @@ local TweenService = game:GetService("TweenService")
 local raidTab = Window:CreateTab("⚔️ Instant Kill Raid")
 
 raidTab:CreateButton({
-	Name = "💀 Instant Kill Raid (Set all monsters' HP to 0%)",
+	Name = "💀 Instant Kill Raid (❌Do not open if you are not in a raid or it will bug.)",
 	Callback = function()
 		local Players = game:GetService("Players") 
 		local living = workspace:WaitForChild("Living")
