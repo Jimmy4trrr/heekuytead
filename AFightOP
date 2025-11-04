@@ -1,0 +1,280 @@
+-- Load Rayfield UI
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "🔥 Anime Fight | Kuyraisus 🔆",
+	LoadingTitle = "Anime Fight❄",
+	LoadingSubtitle = "Kuyraisus🌟 ",
+})
+
+local farmTab = Window:CreateTab("⚔️ Auto Farm", 4483362458)
+local towerTab = Window:CreateTab("🏯 Tower Mode", 4483362458)
+local settingTab = Window:CreateTab("⚙️ Settings", 4483362458)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Bridge = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Bridge")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+
+---------------------------------------------------------------------
+-- ⚡ Fast Click
+---------------------------------------------------------------------
+local fastClick = false
+
+farmTab:CreateToggle({
+	Name = "⚡ Fast Click",
+	CurrentValue = false,
+	Flag = "FastClick",
+	Callback = function(Value)
+		fastClick = Value
+		if fastClick then
+			task.spawn(function()
+				while fastClick do
+					local args = {"Fighters", "Attack", "Click"}
+					Bridge:FireServer(unpack(args))
+					task.wait(0.01)
+				end
+			end)
+		end
+	end,
+})
+
+---------------------------------------------------------------------
+-- 👾 Auto Farm Monster
+---------------------------------------------------------------------
+local monsterList = {}
+local selectedMonsters = {}
+local autoFarmMon = false
+
+local function updateMonsterList()
+	local enemies = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Enemies")
+	if not enemies then return end
+	local names = {}
+	for _, v in pairs(enemies:GetChildren()) do
+		if v.ClassName == "Model" and not table.find(names, v.Name) then
+			table.insert(names, v.Name)
+		end
+	end
+	monsterList = names
+end
+
+updateMonsterList()
+
+local dropdown = farmTab:CreateDropdown({
+	Name = "👹 Select Mon",
+	Options = monsterList,
+	MultipleOptions = true,
+	Flag = "MonsterList",
+	Callback = function(Value)
+		selectedMonsters = Value
+	end,
+})
+
+farmTab:CreateButton({
+	Name = "🔁 Refresh Mon List",
+	Callback = function()
+		updateMonsterList()
+		dropdown:Refresh(monsterList, true)
+		Rayfield:Notify({
+			Title = "✅ Monster List Updated",
+			Content = "Successfully refreshed monster list ❤️",
+			Duration = 4
+		})
+	end,
+})
+
+local function findNextTarget()
+	local enemiesFolder = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Enemies")
+	if not enemiesFolder then return nil end
+	for _, mob in ipairs(enemiesFolder:GetChildren()) do
+		if mob:IsA("Model") and table.find(selectedMonsters, mob.Name) then
+			local hum = mob:FindFirstChildOfClass("Humanoid")
+			local hrp = mob:FindFirstChild("HumanoidRootPart")
+			if hum and hrp and hum.Health > 0 then
+				return mob
+			end
+		end
+	end
+	return nil
+end
+
+farmTab:CreateToggle({
+	Name = "👾 Auto Farm Mon",
+	CurrentValue = false,
+	Flag = "AutoFarmMon",
+	Callback = function(Value)
+		autoFarmMon = Value
+		if autoFarmMon then
+			task.spawn(function()
+				while autoFarmMon do
+					local enemiesFolder = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Enemies")
+					local dropsFolder = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Drops")
+
+					if not enemiesFolder then task.wait(0.2) continue end
+
+					local target = findNextTarget()
+					if target then
+						local hum = target:FindFirstChildOfClass("Humanoid")
+						local hrp = target:FindFirstChild("HumanoidRootPart")
+						if hum and hrp then
+							local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+							local root = char:WaitForChild("HumanoidRootPart")
+
+							while autoFarmMon and hum.Health > 0 and target.Parent do
+								root.CFrame = hrp.CFrame + Vector3.new(0, 6, 0)
+								task.wait(0.2)
+
+								local dropDetected = false
+								if dropsFolder then
+									for _, drop in pairs(dropsFolder:GetChildren()) do
+										if drop:IsA("Part") then
+											dropDetected = true
+											break
+										end
+									end
+								end
+
+								if dropDetected then
+									break
+								end
+							end
+						end
+					end
+					task.wait(0.2)
+				end
+			end)
+		end
+	end,
+})
+
+---------------------------------------------------------------------
+-- 🏯 Tower Auto Farm
+---------------------------------------------------------------------
+local autoTower = false
+local leaveAtWave = 10
+local towerRunning = false
+
+towerTab:CreateSlider({
+	Name = "🎯 Leave Tower Wave",
+	Range = {1, 100},
+	Increment = 1,
+	Suffix = "Wave",
+	CurrentValue = 10,
+	Flag = "LeaveWave",
+	Callback = function(Value)
+		leaveAtWave = Value
+	end,
+})
+
+towerTab:CreateToggle({
+	Name = "🏯 Auto Tower (Start + Rejoin)",
+	CurrentValue = false,
+	Flag = "AutoTower",
+	Callback = function(Value)
+		autoTower = Value
+		if autoTower then
+			task.spawn(function()
+				while autoTower do
+					if not towerRunning then
+						local args = {"Gamemodes", "Tower", "Start"}
+						Bridge:FireServer(unpack(args))
+						towerRunning = true
+						task.wait(5)
+					end
+
+					local currentWave = 0
+					pcall(function()
+						local waveText = LocalPlayer.PlayerGui.UI.HUD.Tower.Frame.Wave.Value.UID.Text
+						currentWave = tonumber(waveText) or 0
+					end)
+
+					if currentWave >= leaveAtWave then
+						local args = {"Gamemodes", "Tower", "Leave"}
+						Bridge:FireServer(unpack(args))
+						towerRunning = false
+						task.wait(7)
+					end
+
+					local enemiesFolder = workspace:FindFirstChild("Client") and workspace.Client:FindFirstChild("Enemies")
+					if enemiesFolder then
+						for _, enemy in pairs(enemiesFolder:GetChildren()) do
+							if enemy.ClassName == "Model" and enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChildOfClass("Humanoid") then
+								local hum = enemy:FindFirstChildOfClass("Humanoid")
+								if hum.Health > 0 then
+									local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+									local root = char:WaitForChild("HumanoidRootPart")
+									root.CFrame = enemy.HumanoidRootPart.CFrame + Vector3.new(0, 6, 0)
+									repeat task.wait(0.3) until not enemy.Parent or hum.Health <= 0
+								end
+							end
+						end
+					end
+					task.wait(1)
+				end
+			end)
+		end
+	end,
+})
+
+---------------------------------------------------------------------
+-- ⚙️ Settings
+---------------------------------------------------------------------
+local walkSpeed = 16
+local infJump = false
+
+settingTab:CreateSlider({
+	Name = "🏃 Walk Speed",
+	Range = {16, 200},
+	Increment = 1,
+	Suffix = "Speed",
+	CurrentValue = 16,
+	Flag = "WalkSpeed",
+	Callback = function(Value)
+		walkSpeed = Value
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hum = char:WaitForChild("Humanoid")
+		hum.WalkSpeed = Value
+	end,
+})
+
+settingTab:CreateToggle({
+	Name = "🦘 Infinite Jump",
+	CurrentValue = false,
+	Flag = "InfJump",
+	Callback = function(Value)
+		infJump = Value
+	end,
+})
+
+UIS.JumpRequest:Connect(function()
+	if infJump then
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hum = char:WaitForChild("Humanoid")
+		hum:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
+end)
+
+settingTab:CreateToggle({
+	Name = "🕒 Anti AFK",
+	CurrentValue = false,
+	Flag = "AntiAFK",
+	Callback = function(Value)
+		if Value then
+			task.spawn(function()
+				while Value do
+					game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+					task.wait(60)
+					game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+				end
+			end)
+		end
+	end,
+})
+
+---------------------------------------------------------------------
+Rayfield:Notify({
+	Title = "✅ Script Loaded",
+	Content = "AutoFarm + Settings loaded successfully ❤️",
+	Duration = 6
+})
