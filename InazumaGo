@@ -54,7 +54,7 @@ local Window = Rayfield:CreateWindow({
 ----------------------------------------------------------
 -- 🎯 TAB: Element Reroll
 ----------------------------------------------------------
-local ElementTab = Window:CreateTab("🎯 Element Reroll")
+local ElementTab = Window:CreateTab("🎯 IFN Element Reroll")
 
 ElementTab:CreateDropdown({
 	Name = "Select Target Element",
@@ -138,7 +138,7 @@ end)
 ----------------------------------------------------------
 -- 📚 TAB: Rare Manual
 ----------------------------------------------------------
-local ManualTab = Window:CreateTab("📘 Rare Manual")
+local ManualTab = Window:CreateTab("📘 IFN roll Hissatsus")
 
 ManualTab:CreateSlider({
 	Name = "Amount to Use",
