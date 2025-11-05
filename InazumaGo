@@ -1,0 +1,250 @@
+-- 🔆 Kuyraisus UI System 🔆
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerFolder = LocalPlayer:WaitForChild("PlayerFolder")
+local ElementValue = PlayerFolder:WaitForChild("Element")
+
+local InventoryEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("InventoryTest")
+
+-- 🩵 สถานะ
+local TargetElement = "Divine"
+local AutoReroll = false
+local AutoManual = false
+
+-- ⚡ ฟังก์ชันใช้งาน Remote ต่าง ๆ
+local function RerollElement()
+    local args = {
+        [1] = "Use",
+        [2] = "Element Reroll"
+    }
+    InventoryEvent:FireServer(unpack(args))
+end
+
+local function UseRareManual()
+    local args = {
+        [1] = "Use",
+        [2] = "Rare Manual"
+    }
+    InventoryEvent:FireServer(unpack(args))
+end
+
+local function EquipItem(name)
+    local args = {
+        [1] = "Equip",
+        [2] = name
+    }
+    InventoryEvent:FireServer(unpack(args))
+end
+
+local function RejoinServer()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end
+
+-- 🪄 Window หลัก
+local Window = Rayfield:CreateWindow({
+	Name = "🔥 Kuyraisus 🔆 | Inazuma Strikers",
+	LoadingTitle = "AutoFarm System",
+	LoadingSubtitle = "KUYRAISUS"
+})
+
+----------------------------------------------------------
+-- 🎯 TAB: Element Reroll
+----------------------------------------------------------
+local ElementTab = Window:CreateTab("🎯 Element Reroll")
+
+ElementTab:CreateDropdown({
+	Name = "Select Target Element",
+	Options = { "Divine", "Void", "Earth", "Forest", "Wind", "Fire" },
+	CurrentOption = "Divine",
+	Callback = function(Option)
+		if typeof(Option) == "table" then
+			TargetElement = Option[1]
+		else
+			TargetElement = Option
+		end
+		Rayfield:Notify({
+			Title = "Target Changed",
+			Content = "Now targeting " .. tostring(TargetElement),
+			Duration = 3
+		})
+	end
+})
+
+ElementTab:CreateToggle({
+	Name = "Auto Reroll (0.1s per roll)",
+	CurrentValue = false,
+	Callback = function(Value)
+		AutoReroll = Value
+		if Value then
+			Rayfield:Notify({
+				Title = "Started",
+				Content = "Auto rerolling for " .. tostring(TargetElement) .. "...",
+				Duration = 3
+			})
+		else
+			Rayfield:Notify({
+				Title = "Stopped",
+				Content = "Auto reroll paused.",
+				Duration = 3
+			})
+		end
+	end
+})
+
+ElementTab:CreateButton({
+	Name = "🔁 Rejoin Server",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "Rejoining...",
+			Content = "Teleporting back to server",
+			Duration = 3
+		})
+		task.wait(1)
+		RejoinServer()
+	end
+})
+
+-- 🔁 ลูปสุ่ม Element
+task.spawn(function()
+	while task.wait(0.1) do
+		if AutoReroll then
+			if tostring(ElementValue.Value) == tostring(TargetElement) then
+				Rayfield:Notify({
+					Title = "✨ Success!",
+					Content = "Got " .. tostring(TargetElement) .. "!",
+					Duration = 6
+				})
+				AutoReroll = false
+				task.wait(1)
+				RejoinServer()
+				continue
+			end
+			local oldElement = ElementValue.Value
+			RerollElement()
+			local timeout, elapsed = 5, 0
+			repeat
+				task.wait(0.1)
+				elapsed += 0.1
+			until ElementValue.Value ~= oldElement or elapsed >= timeout
+			print("🔁 Rerolled! Current:", ElementValue.Value)
+		end
+	end
+end)
+
+----------------------------------------------------------
+-- 📚 TAB: Rare Manual
+----------------------------------------------------------
+local ManualTab = Window:CreateTab("📘 Rare Manual")
+
+ManualTab:CreateSlider({
+	Name = "Amount to Use",
+	Range = {1, 500},
+	Increment = 1,
+	CurrentValue = 100,
+	Flag = "ManualAmount",
+	Callback = function(Value)
+		ManualAmount = Value
+	end
+})
+
+ManualTab:CreateButton({
+	Name = "Start Using Rare Manual (0.1s delay)",
+	Callback = function()
+		AutoManual = true
+		for i = 1, ManualAmount or 100 do
+			if not AutoManual then break end
+			UseRareManual()
+			task.wait(0.1)
+		end
+		AutoManual = false
+		Rayfield:Notify({
+			Title = "✅ Done!",
+			Content = "Finished using " .. tostring(ManualAmount or 100) .. " manuals.",
+			Duration = 5
+		})
+		task.wait(1)
+		RejoinServer()
+	end
+})
+
+ManualTab:CreateButton({
+	Name = "🔁 Rejoin Server",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "Rejoining...",
+			Content = "Teleporting back to server",
+			Duration = 3
+		})
+		task.wait(1)
+		RejoinServer()
+	end
+})
+
+----------------------------------------------------------
+-- 🧤 TAB: Equip Accessories
+----------------------------------------------------------
+local EquipTab = Window:CreateTab("🧤 Equip Accessories")
+
+local Accessories = {
+	ReplicatedStorage.Accessories.Boots,
+	ReplicatedStorage.Accessories.Bracelet,
+	ReplicatedStorage.Accessories.Gloves,
+	ReplicatedStorage.Accessories.Pendant,
+	ReplicatedStorage.Accessories.Special
+}
+
+for _, folder in pairs(Accessories) do
+	for _, item in pairs(folder:GetChildren()) do
+		EquipTab:CreateButton({
+			Name = "Equip: " .. item.Name,
+			Callback = function()
+				EquipItem(item.Name)
+				Rayfield:Notify({
+					Title = "Equipped",
+					Content = "Now wearing " .. item.Name,
+					Duration = 3
+				})
+			end
+		})
+	end
+end
+----------------------------------------------------------
+-- 🎮 TAB: Play Settings
+----------------------------------------------------------
+local PlayTab = Window:CreateTab("🎮 Play Settings")
+
+PlayTab:CreateButton({
+	Name = "inf FP",
+	Callback = function()
+		local player = game:GetService("Players").LocalPlayer
+		local folder = player:WaitForChild("PlayerFolder")
+		local MaxFP = folder:WaitForChild("MaxFP")
+		MaxFP.Value = 9999999
+
+		Rayfield:Notify({
+			Title = "✅ MaxFP Set!",
+			Content = "MaxFP now = 9,999,999",
+			Duration = 4
+		})
+	end
+})
+
+PlayTab:CreateButton({
+	Name = "Max TP = 9999",
+	Callback = function()
+		local player = game:GetService("Players").LocalPlayer
+		local folder = player:WaitForChild("PlayerFolder")
+		local MaxTP = folder:WaitForChild("MaxTP")
+		MaxTP.Value = 9999
+
+		Rayfield:Notify({
+			Title = "⚡ MaxTP Set!",
+			Content = "MaxTP now = 9,999",
+			Duration = 4
+		})
+	end
+})
