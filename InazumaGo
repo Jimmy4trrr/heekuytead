@@ -152,7 +152,7 @@ ManualTab:CreateSlider({
 })
 
 ManualTab:CreateButton({
-	Name = "Start Using Rare Manual (0.1s delay)",
+	Name = "Start Roll",
 	Callback = function()
 		AutoManual = true
 		for i = 1, ManualAmount or 100 do
