@@ -1,0 +1,94 @@
+-- 🔆 Kuyraisus UI System 🔆
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Kuyraisus 🔆 | Auto Farm & Hit",
+    LoadingTitle = "Kuyraisus System",
+    LoadingSubtitle = "By หนูของนายท่าน ❤️",
+})
+
+local Tab = Window:CreateTab("Auto Farm", 4483362458)
+
+-------------------------------------------------------
+-- ✅ ดึงรายชื่อมอน
+local enemiesFolder = workspace.Ignore.Characters.NPCs.EnemyNPCs
+local MobNames = {}
+
+for _, mob in ipairs(enemiesFolder:GetChildren()) do
+    if not table.find(MobNames, mob.Name) then
+        table.insert(MobNames, mob.Name)
+    end
+end
+
+-------------------------------------------------------
+-- ✅ ตัวแปร
+local SelectedMob = nil
+local AutoFarm = false
+local AutoHit = false
+
+Tab:CreateDropdown({
+    Name = "เลือกชื่อมอน",
+    Options = MobNames,
+    CurrentOption = "",
+    Callback = function(v)
+        SelectedMob = v
+    end,
+})
+
+-------------------------------------------------------
+-- ✅ ฟังก์ชันตีมอน
+local function HitMob()
+    local args = {
+        [1] = "RequestAttack",
+        [2] = { Type = "Hit" }
+    }
+    game:GetService("ReplicatedStorage").Remotes.Controversial.Combat:FireServer(unpack(args))
+end
+
+-------------------------------------------------------
+-- ✅ ฟังก์ชัน Auto Farm (วาร์ปไปหลังหัวมอน)
+local function AutoFarmMob()
+    if not SelectedMob then return end
+
+    local player = game.Players.LocalPlayer
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    for _, mob in ipairs(enemiesFolder:GetChildren()) do
+        if mob.Name == SelectedMob and mob:FindFirstChild("HumanoidRootPart") then
+            local mobRoot = mob.HumanoidRootPart
+            local behindHead = mobRoot.CFrame * CFrame.new(0, 3, 2)
+
+            -- วาร์ปทันที
+            root.CFrame = behindHead
+            task.wait(0.1)
+        end
+    end
+end
+
+-------------------------------------------------------
+-- ✅ UI Toggle Auto Farm
+Tab:CreateToggle({
+    Name = "Auto Farm (วาร์ปไปหลังหัวมอน)",
+    CurrentValue = false,
+    Callback = function(state)
+        AutoFarm = state
+        while AutoFarm do
+            AutoFarmMob()
+        end
+    end,
+})
+
+-------------------------------------------------------
+-- ✅ UI Toggle Auto Hit
+Tab:CreateToggle({
+    Name = "Auto Hit (ตีมอนทุก 0.1s)",
+    CurrentValue = false,
+    Callback = function(state)
+        AutoHit = state
+        while AutoHit do
+            HitMob()
+            task.wait(0.1)
+        end
+    end,
+})
