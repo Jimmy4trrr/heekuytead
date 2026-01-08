@@ -1,0 +1,259 @@
+--====================--
+-- RAYFIELD UI
+--====================--
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Kuyraisus 🔆 | Auto Farm",
+    LoadingTitle = "Auto Farm System",
+    LoadingSubtitle = "Rayfield Edition",
+    ConfigurationSaving = {Enabled = false}
+})
+
+local Tab = Window:CreateTab("Auto Farm", 4483362458)
+local TabOP = Window:CreateTab("OP STAT", 4483362458)
+local TabAttack = Window:CreateTab("OP AutoAttack", 4483362458)
+
+--====================--
+-- GLOBAL FLAGS
+--====================--
+getgenv().AutoFarm   = false
+getgenv().AutoAttack = false
+getgenv().Noclip     = false
+getgenv().AntiAFK    = false
+
+getgenv().SelectedMobs = {}
+getgenv().FollowDistance = 5
+getgenv().FollowHeight   = 3
+
+--====================--
+-- SERVICES
+--====================--
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+
+local LP = Players.LocalPlayer
+
+--====================--
+-- ANTI AFK
+--====================--
+local AntiAFKConnection
+
+local function EnableAntiAFK()
+    if AntiAFKConnection then return end
+    AntiAFKConnection = LP.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
+end
+
+local function DisableAntiAFK()
+    if AntiAFKConnection then
+        AntiAFKConnection:Disconnect()
+        AntiAFKConnection = nil
+    end
+end
+
+--====================--
+-- MONSTER FOLDER
+--====================--
+local MonsterFolder = workspace:WaitForChild("AI/Player")
+
+local MonsterList = {
+    "Athlete",
+    "Bulk Ghoul",
+    "First class Investigator",
+    "Human",
+    "Rank 1 Investigator",
+    "Rank 2 Investigator",
+    "Rin Ghoul",
+    "Serpent Ghoul"
+}
+
+--====================--
+-- CHARACTER HANDLER
+--====================--
+local Char, Hum, HRP
+local BP, BG
+
+local function SetupCharacter(character)
+    Char = character
+    Hum = Char:WaitForChild("Humanoid")
+    HRP = Char:WaitForChild("HumanoidRootPart")
+
+    if BP then BP:Destroy() end
+    if BG then BG:Destroy() end
+
+    BP = Instance.new("BodyPosition")
+    BP.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    BP.P = 30000
+    BP.Parent = HRP
+
+    BG = Instance.new("BodyGyro")
+    BG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    BG.P = 30000
+    BG.Parent = HRP
+end
+
+SetupCharacter(LP.Character or LP.CharacterAdded:Wait())
+LP.CharacterAdded:Connect(function(c)
+    task.wait(0.2)
+    SetupCharacter(c)
+end)
+
+--====================--
+-- UI : AUTO FARM
+--====================--
+Tab:CreateToggle({
+    Name = "Auto Farm",
+    Callback = function(v)
+        getgenv().AutoFarm = v
+    end
+})
+
+Tab:CreateDropdown({
+    Name = "Select Monster",
+    Options = MonsterList,
+    MultipleOptions = true,
+    Callback = function(opts)
+        table.clear(getgenv().SelectedMobs)
+        for _, v in pairs(opts) do
+            getgenv().SelectedMobs[v] = true
+        end
+    end
+})
+
+Tab:CreateSlider({
+    Name = "Follow Distance",
+    Range = {0, 50},
+    Increment = 0.5,
+    CurrentValue = getgenv().FollowDistance,
+    Callback = function(v)
+        getgenv().FollowDistance = v
+    end
+})
+
+Tab:CreateSlider({
+    Name = "Follow Height",
+    Range = {-10, 50},
+    Increment = 0.5,
+    CurrentValue = getgenv().FollowHeight,
+    Callback = function(v)
+        getgenv().FollowHeight = v
+    end
+})
+
+--====================--
+-- OP STAT
+--====================--
+TabOP:CreateButton({
+    Name = "SET SPEED = 1000",
+    Callback = function()
+        if Hum then
+            Hum.WalkSpeed = 1000
+        end
+    end
+})
+
+TabOP:CreateButton({
+    Name = "ADD STAMINA = 999999999",
+    Callback = function()
+        if Hum and Hum:FindFirstChild("Stamina") then
+            Hum.Stamina.Value = 999999999
+        end
+    end
+})
+
+--====================--
+-- OP AUTO ATTACK
+--====================--
+TabAttack:CreateToggle({
+    Name = "Auto Attack",
+    Callback = function(v)
+        getgenv().AutoAttack = v
+        if v then
+            task.spawn(function()
+                while getgenv().AutoAttack do
+                    local args = {
+                        [1] = {
+                            [1] = "NormalAttack",
+                            [2] = "\2"
+                        }
+                    }
+                    ReplicatedStorage.BridgeNet2.dataRemoteEvent:FireServer(unpack(args))
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+})
+
+TabAttack:CreateToggle({
+    Name = "Noclip",
+    Callback = function(v)
+        getgenv().Noclip = v
+    end
+})
+
+TabAttack:CreateToggle({
+    Name = "Anti AFK",
+    Callback = function(v)
+        getgenv().AntiAFK = v
+        if v then
+            EnableAntiAFK()
+        else
+            DisableAntiAFK()
+        end
+    end
+})
+
+--====================--
+-- NOCLIP LOOP
+--====================--
+RunService.Stepped:Connect(function()
+    if getgenv().Noclip and Char then
+        for _, v in pairs(Char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
+end)
+
+--====================--
+-- FIND MONSTER
+--====================--
+local function GetMonster()
+    for _, mob in pairs(MonsterFolder:GetChildren()) do
+        if mob:IsA("Model")
+        and getgenv().SelectedMobs[mob.Name]
+        and mob:FindFirstChild("Humanoid")
+        and mob.Humanoid.Health > 0
+        and mob:FindFirstChild("HumanoidRootPart") then
+            return mob
+        end
+    end
+end
+
+--====================--
+-- MAIN LOOP
+--====================--
+RunService.Heartbeat:Connect(function()
+    if not Char or not Hum or not HRP then return end
+    if not getgenv().AutoFarm then return end
+
+    local mob = GetMonster()
+    if not mob then return end
+
+    local mhrp = mob.HumanoidRootPart
+
+    BP.Position =
+        mhrp.Position
+        - mhrp.CFrame.LookVector * getgenv().FollowDistance
+        + Vector3.new(0, getgenv().FollowHeight, 0)
+
+    BG.CFrame = CFrame.lookAt(HRP.Position, mhrp.Position)
+end)
