@@ -1,0 +1,53 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Remote = ReplicatedStorage.Remotes.RemoteFunction
+
+local Codes = {
+    "HappyNewYear",
+    "50kLikes",
+    "10MVisits",
+    "NewBloodlines",
+    "NewSpecials",
+    "15kLikes",
+    "25kLikes",
+    "30kLikes",
+    "MinorBugs",
+    "BadActors",
+    "JanuaryIncident",
+    "Krampus",
+    "SecretCode",
+    "ChristmasTime",
+    "10kLikes",
+    "1MVisits",
+    "ChristmasDelay",
+    "Gullible67",
+    "1kLikes",
+    "2kLikes",
+    "5kLikes",
+    "100kVisits",
+    "1000Members",
+    "MobsUpdate",
+    "1WeekAnniversary",
+    "400CCU",
+    "10kVisits",
+    "100Favs",
+    "100CCU",
+    "50Likes",
+    "FreeChikara3",
+    "FreeChikara2",
+    "FreeChikara",
+    "YenCode"
+}
+
+for _, code in ipairs(Codes) do
+    local success, result = pcall(function()
+        return Remote:InvokeServer("Code", code)
+    end)
+
+    if success then
+        warn("Redeem Code:", code, "Result:", result)
+    else
+        warn("Failed Code:", code)
+    end
+
+    task.wait(5)
+end
