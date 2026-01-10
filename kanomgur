@@ -25,6 +25,7 @@ getgenv().AntiAFK    = false
 getgenv().SelectedMobs = {}
 getgenv().FollowDistance = 5
 getgenv().FollowHeight   = 3
+getgenv().FollowSmooth   = 0.15 -- ความเร็วลอย (ยิ่งมากยิ่งไว)
 
 --====================--
 -- SERVICES
@@ -40,7 +41,6 @@ local LP = Players.LocalPlayer
 -- ANTI AFK
 --====================--
 local AntiAFKConnection
-
 local function EnableAntiAFK()
     if AntiAFKConnection then return end
     AntiAFKConnection = LP.Idled:Connect(function()
@@ -89,13 +89,16 @@ local function SetupCharacter(character)
     if BG then BG:Destroy() end
 
     BP = Instance.new("BodyPosition")
-    BP.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    BP.P = 30000
+    BP.MaxForce = Vector3.new(50000, 50000, 50000)
+    BP.P = 8000
+    BP.D = 1000
+    BP.Position = HRP.Position
     BP.Parent = HRP
 
     BG = Instance.new("BodyGyro")
-    BG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    BG.P = 30000
+    BG.MaxTorque = Vector3.new(50000, 50000, 50000)
+    BG.P = 6000
+    BG.D = 500
     BG.Parent = HRP
 end
 
@@ -109,7 +112,7 @@ end)
 -- UI : AUTO FARM
 --====================--
 Tab:CreateToggle({
-    Name = "Auto Farm",
+    Name = "Auto Farm (Smooth)",
     Callback = function(v)
         getgenv().AutoFarm = v
     end
@@ -147,6 +150,16 @@ Tab:CreateSlider({
     end
 })
 
+Tab:CreateSlider({
+    Name = "Follow Smooth (Speed)",
+    Range = {0.05, 0.3},
+    Increment = 0.01,
+    CurrentValue = getgenv().FollowSmooth,
+    Callback = function(v)
+        getgenv().FollowSmooth = v
+    end
+})
+
 --====================--
 -- OP STAT
 --====================--
@@ -155,15 +168,6 @@ TabOP:CreateButton({
     Callback = function()
         if Hum then
             Hum.WalkSpeed = 1000
-        end
-    end
-})
-
-TabOP:CreateButton({
-    Name = "ADD STAMINA = 999999999",
-    Callback = function()
-        if Hum and Hum:FindFirstChild("Stamina") then
-            Hum.Stamina.Value = 999999999
         end
     end
 })
@@ -178,13 +182,9 @@ TabAttack:CreateToggle({
         if v then
             task.spawn(function()
                 while getgenv().AutoAttack do
-                    local args = {
-                        [1] = {
-                            [1] = "NormalAttack",
-                            [2] = "\2"
-                        }
-                    }
-                    ReplicatedStorage.BridgeNet2.dataRemoteEvent:FireServer(unpack(args))
+                    ReplicatedStorage.BridgeNet2.dataRemoteEvent:FireServer({
+                        {"NormalAttack","\2"}
+                    })
                     task.wait(0.2)
                 end
             end)
@@ -240,21 +240,22 @@ local function GetMonster()
 end
 
 --====================--
--- MAIN LOOP
+-- MAIN LOOP (SMOOTH FOLLOW)
 --====================--
 RunService.Heartbeat:Connect(function()
-    if not Char or not Hum or not HRP then return end
     if not getgenv().AutoFarm then return end
+    if not HRP or not BP or not BG then return end
 
     local mob = GetMonster()
     if not mob then return end
 
     local mhrp = mob.HumanoidRootPart
 
-    BP.Position =
+    local targetPos =
         mhrp.Position
         - mhrp.CFrame.LookVector * getgenv().FollowDistance
         + Vector3.new(0, getgenv().FollowHeight, 0)
 
+    BP.Position = BP.Position:Lerp(targetPos, getgenv().FollowSmooth)
     BG.CFrame = CFrame.lookAt(HRP.Position, mhrp.Position)
 end)
