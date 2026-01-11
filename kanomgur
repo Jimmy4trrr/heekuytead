@@ -183,7 +183,7 @@ TabAttack:CreateToggle({
             task.spawn(function()
                 while getgenv().AutoAttack do
                     ReplicatedStorage.BridgeNet2.dataRemoteEvent:FireServer({
-                        {"NormalAttack","\2"}
+                        {"NormalAttack","\13"}
                     })
                     task.wait(0.2)
                 end
