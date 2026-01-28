@@ -1,0 +1,52 @@
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+local scrollingFrame = player.PlayerGui.Merchant.Main.Container.ScrollingFrame
+
+_G.AutoBuy = true -- เปลี่ยนเป็น false เพื่อหยุดการทำงาน
+
+local function smartClick(obj)
+    if obj and obj:IsA("GuiButton") and obj.Visible then
+        -- 1. เลื่อนหน้าจอไปหาปุ่ม
+        scrollingFrame.CanvasPosition = Vector2.new(0, obj.AbsolutePosition.Y - scrollingFrame.AbsolutePosition.Y)
+        task.wait(0.3) 
+
+        -- 2. คำนวณตำแหน่ง (บวก 58 สำหรับ Topbar)
+        local x = obj.AbsolutePosition.X + (obj.AbsoluteSize.X / 2)
+        local y = obj.AbsolutePosition.Y + (obj.AbsoluteSize.Y / 2) + 58
+        
+        -- 3. จำลองการคลิก
+        VirtualInputManager:SendMouseMoveEvent(x, y, game)
+        task.wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        return true
+    end
+    return false
+end
+
+-- เริ่มระบบ Loop
+task.spawn(function()
+    while _G.AutoBuy do
+        print("--- เริ่มรอบการซื้อใหม่ ---")
+        
+        for i = 1, 9 do
+            if not _G.AutoBuy then break end -- เช็คตัวเปิด/ปิดลูป
+            
+            local folder = scrollingFrame:FindFirstChild(tostring(i))
+            if folder then
+                local buyBtn = folder:FindFirstChild("BuyBtn")
+                if buyBtn then
+                    print("กำลังซื้อรายการที่: " .. i)
+                    smartClick(buyBtn)
+                    task.wait(0.5) -- พักระหว่างชิ้น
+                end
+            end
+        end
+        
+        print("ซื้อครบ 9 รายการแล้ว รอรอบถัดไป...")
+        task.wait(5) -- รอ 5 วินาทีก่อนเริ่มวนใหม่ (ปรับเวลาได้)
+    end
+    print("หยุดการทำงาน Auto Buy")
+end)
