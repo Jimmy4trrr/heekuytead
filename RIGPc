@@ -1,0 +1,209 @@
+--================================================================--
+--        KUYRAISUS 🔆 ZENITSU AUTO FARM
+--================================================================--
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Kuyraisus 🔆 | Zenitsu Farm ✨",
+    LoadingTitle = "REIGN PIECE🎇🎉",
+    LoadingSubtitle = "by Kuyraisus",
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = "KuyraisusZenitsu"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+    KeySystem = false
+})
+
+--================ TABS =================
+local MainTab = Window:CreateTab("🏠 Main")
+local EquipTab = Window:CreateTab("⚔️ AutoEquip") 
+local SkillTab = Window:CreateTab("⚡ Skill")
+local SettingTab = Window:CreateTab("⚙️ Settings")
+
+--================ SERVICES =================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local plr = Players.LocalPlayer
+
+--================ CONFIG =================
+getgenv().AutoSummon = false
+getgenv().AutoFarm = false
+getgenv().AutoM1 = false
+getgenv().AutoSkill = false
+
+getgenv().AutoEquipEnabled = false
+getgenv().SelectedToolName = ""
+
+getgenv().FarmDistance = 6
+getgenv().IsSummoning = false
+getgenv().Noclip = false
+getgenv().InfJump = false
+getgenv().InfAFK = false
+
+local SkillEnabled = {[1] = false, [2] = false, [3] = false, [4] = false}
+
+--================ UTILS & SMART STOP =================
+local function Char() return plr.Character or plr.CharacterAdded:Wait() end
+local function HRP() return Char():WaitForChild("HumanoidRootPart") end
+local EnemyFolder = workspace.Ignore.Characters.NPCs.EnemyNPCs
+local HumanFolder = workspace.Ignore.Characters.Humans
+
+-- [[ SMART STOP CHECK ]] ตรวจจับ Tool ในโมเดลของ Humans
+local function IsAnyHumanHoldingTool()
+    for _, human in pairs(HumanFolder:GetChildren()) do
+        if human:IsA("Model") and human:FindFirstChildOfClass("Tool") then
+            return true
+        end
+    end
+    return false
+end
+
+-- ดึงรายชื่ออาวุธจาก Backpack
+local function GetBackpackTools()
+    local tools = {}
+    for _, tool in pairs(plr.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            table.insert(tools, tool.Name)
+        end
+    end
+    return tools
+end
+
+--================ AUTO EQUIP LOGIC =================
+task.spawn(function()
+    while task.wait(0.4) do
+        if not getgenv().AutoEquipEnabled or getgenv().SelectedToolName == "" then continue end
+
+        -- [[ SMART STOP ]] หยุดถ้าพบ Tool ใน NPC Humans
+        if IsAnyHumanHoldingTool() then continue end
+
+        local char = Char()
+        local toolInHand = char:FindFirstChildOfClass("Tool")
+
+        if not toolInHand or toolInHand.Name ~= getgenv().SelectedToolName then
+            local tool = plr.Backpack:FindFirstChild(getgenv().SelectedToolName)
+            if tool then
+                tool.Parent = char
+            end
+        end
+    end
+end)
+
+--================ AUTO FARM LOGIC =================
+task.spawn(function()
+    while task.wait(0.1) do
+        if not getgenv().AutoFarm then 
+            getgenv().Noclip = false
+            continue 
+        end
+        local boss = EnemyFolder:FindFirstChild("Zenitsu")
+        if not boss or getgenv().IsSummoning then continue end
+
+        local bhrp = boss:FindFirstChild("HumanoidRootPart")
+        if not bhrp then continue end
+
+        getgenv().Noclip = true
+        local pos = bhrp.Position - bhrp.CFrame.LookVector * getgenv().FarmDistance + Vector3.new(0, 2.5, 0)
+        Char():SetPrimaryPartCFrame(CFrame.new(pos, bhrp.Position))
+    end
+end)
+
+--================ ATTACK & SKILL & SUMMON =================
+task.spawn(function()
+    while task.wait(0.15) do
+        if getgenv().AutoM1 and EnemyFolder:FindFirstChild("Zenitsu") then
+            ReplicatedStorage.Remotes.Events.M1:FireServer("Action", 1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.6) do
+        if not getgenv().AutoSkill then continue end
+        local boss = EnemyFolder:FindFirstChild("Zenitsu")
+        if not boss then continue end
+        local pos = boss.HumanoidRootPart.Position
+        for id,enabled in pairs(SkillEnabled) do
+            if enabled then
+                ReplicatedStorage.Remotes.Events.Skill.SkillRequest:FireServer(id, pos, "Startup")
+                task.wait(0.15)
+            end
+        end
+    end
+end)
+
+local SummonPrompt = workspace.Ignore.Characters.NPCs.FriendlyNPCs.Interaction.Transactions["Shock Ghost"].HumanoidRootPart.ProximityPrompt
+task.spawn(function()
+    while task.wait(0.8) do
+        if not getgenv().AutoSummon then continue end
+        if EnemyFolder:FindFirstChild("Zenitsu") then getgenv().IsSummoning = false continue end
+        getgenv().IsSummoning = true
+        HRP().CFrame = SummonPrompt.Parent.CFrame
+        task.wait(0.3)
+        pcall(function() fireproximityprompt(SummonPrompt) end)
+    end
+end)
+
+--================ UI: MAIN TAB =================
+MainTab:CreateSection("🔥 Farming Core")
+MainTab:CreateToggle({Name="Auto Summon 👻", Callback=function(v) getgenv().AutoSummon=v end})
+MainTab:CreateToggle({Name="Auto Farm ⚔️", Callback=function(v) getgenv().AutoFarm=v end})
+MainTab:CreateToggle({Name="Auto M1 👊", Callback=function(v) getgenv().AutoM1=v end})
+MainTab:CreateToggle({Name="Auto Skill ⚡", Callback=function(v) getgenv().AutoSkill=v end})
+
+MainTab:CreateSection("📏 Distance Configuration")
+MainTab:CreateSlider({
+    Name="Farm Distance", Range={3,15}, Increment=1, CurrentValue=6,
+    Callback=function(v) getgenv().FarmDistance=v end
+})
+
+--================ UI: AUTOEQUIP TAB =================
+EquipTab:CreateSection("🎒 Backpack Management")
+
+local ToolDropdown = EquipTab:CreateDropdown({
+    Name = "Select Your Weapon 🗡️",
+    Options = GetBackpackTools(),
+    CurrentOption = "",
+    Callback = function(Option) getgenv().SelectedToolName = Option[1] end,
+})
+
+EquipTab:CreateButton({
+    Name = "🔄 Refresh Backpack List",
+    Callback = function() ToolDropdown:Refresh(GetBackpackTools()) end,
+})
+
+EquipTab:CreateToggle({
+    Name = "Enable Auto Equip ✅",
+    CurrentValue = false,
+    Callback = function(v) getgenv().AutoEquipEnabled = v end
+})
+
+EquipTab:CreateSection("🛡️ Protection")
+EquipTab:CreateParagraph({Title="Smart Stop System", Content="ระบบจะหยุดถืออาวุธทันทีหากตรวจพบว่า NPC Humans กำลังถือ Tool เพื่อความปลอดภัยสูงสุด"})
+
+--================ UI: SKILL & SETTINGS =================
+SkillTab:CreateSection("☄️ Skill Selector")
+SkillTab:CreateToggle({Name="Use Skill Z", Callback=function(v) SkillEnabled[1]=v end})
+SkillTab:CreateToggle({Name="Use Skill X", Callback=function(v) SkillEnabled[2]=v end})
+SkillTab:CreateToggle({Name="Use Skill C", Callback=function(v) SkillEnabled[3]=v end})
+SkillTab:CreateToggle({Name="Use Skill V", Callback=function(v) SkillEnabled[4]=v end})
+
+SettingTab:CreateSection("🌟 Misc Functions")
+SettingTab:CreateToggle({Name="Infinite AFK 😴", Callback=function(v) getgenv().InfAFK=v end})
+SettingTab:CreateToggle({Name="Infinite Jump 🚀", Callback=function(v) getgenv().InfJump=v end})
+
+--================ NOCLIP RUNNER =================
+RunService.Stepped:Connect(function()
+    if getgenv().Noclip then
+        for _,v in pairs(Char():GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
