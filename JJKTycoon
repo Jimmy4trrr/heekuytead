@@ -1,0 +1,170 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Sorcerer Tycoon",
+   LoadingTitle = "Loading Script...",
+   LoadingSubtitle = "BY KUYRAISUS",
+   ConfigurationSaving = { Enabled = false }
+})
+
+local player = game.Players.LocalPlayer
+local SelectedTycoon = "" 
+local WalkSpeedValue = 16 
+
+-- ฟังก์ชันดึงค่า Tycoon
+local function getMyTycoon()
+    local tycoons = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Tycoons")
+    if not tycoons or SelectedTycoon == "" then return nil end
+    return tycoons:FindFirstChild(SelectedTycoon)
+end
+
+-- ระบบ Lock WalkSpeed (ป้องกันความเร็วตกตอนโจมตี)
+task.spawn(function()
+    while task.wait(0.1) do
+        pcall(function()
+            if player.Character and player.Character:FindFirstChild("Humanoid") then
+                if player.Character.Humanoid.WalkSpeed ~= WalkSpeedValue then
+                    player.Character.Humanoid.WalkSpeed = WalkSpeedValue
+                end
+            end
+        end)
+    end
+end)
+
+local ConfigTab = Window:CreateTab("Setup Tycoon", 4483362458)
+local MainTab = Window:CreateTab("Main Features", 4483362458)
+local SettingTab = Window:CreateTab("Settings", 4483362458)
+
+-- === 1. Setup Tycoon ===
+ConfigTab:CreateDropdown({
+   Name = "Select Your Character Tycoon ⚔",
+   Options = {"TycoonGojo", "TycoonYuji", "TycoonToji", "TycoonMegumi", "TycoonChoso", "TycoonNanami", "TycoonNobara", "TycoonTodo", "TycoonToge", "TycoonHanami", "TycoonJogo"},
+   CurrentOption = "",
+   MultipleOptions = false,
+   Callback = function(Option)
+      SelectedTycoon = (type(Option) == "table" and Option[1]) or Option
+      print("เลือก Tycoon: " .. SelectedTycoon .. " | อย่าลืมเช็ค 2. ระบบค่าพลัง (Leaderstats)")
+   end,
+})
+
+-- === 2. Main Features ===
+
+_G.AutoCollect = false
+MainTab:CreateToggle({
+   Name = "Auto Collect Money 💸",
+   CurrentValue = false,
+   Flag = "Collect",
+   Callback = function(Value)
+      _G.AutoCollect = Value
+      task.spawn(function()
+          while _G.AutoCollect do
+              local myTycoon = getMyTycoon()
+              if myTycoon and player.Character:FindFirstChild("HumanoidRootPart") then
+                  local base = myTycoon:FindFirstChild("Base")
+                  if base then
+                      for _, v in pairs(base:GetDescendants()) do
+                          if v.Name == "Collector" and v:IsA("BasePart") then
+                              firetouchinterest(player.Character.HumanoidRootPart, v, 0)
+                              task.wait()
+                              firetouchinterest(player.Character.HumanoidRootPart, v, 1)
+                          end
+                      end
+                  end
+              end
+              task.wait(0.7)
+          end
+      end)
+   end,
+})
+
+_G.AutoUpgrade = false
+MainTab:CreateToggle({
+   Name = "Auto Upgrade Home 🚀",
+   CurrentValue = false,
+   Flag = "Upgrade",
+   Callback = function(Value)
+      _G.AutoUpgrade = Value
+      task.spawn(function()
+          local priorityList = {"Dropper_Yen", "Dropper_Cursed", "Wall_Floor", "Conveyor_Yen", "Conveyor_Cursed", "Door_Floor", "Regen", "Capsule_Floor", "NPC"}
+          while _G.AutoUpgrade do
+              local myTycoon = getMyTycoon()
+              local purchases = myTycoon and (myTycoon:FindFirstChild("Purchases") or myTycoon:FindFirstChild("Purshases"))
+              if purchases and player.Character:FindFirstChild("HumanoidRootPart") then
+                  for _, searchName in ipairs(priorityList) do
+                      for _, folder in pairs(purchases:GetChildren()) do
+                          if folder.Name:find(searchName) then
+                              local base = folder:FindFirstChild("base", true)
+                              if base and base:IsA("BasePart") and base.Transparency < 1 then
+                                  firetouchinterest(player.Character.HumanoidRootPart, base, 0)
+                                  task.wait(0.1)
+                                  firetouchinterest(player.Character.HumanoidRootPart, base, 1)
+                              end
+                          end
+                      end
+                  end
+              end
+              task.wait(1)
+          end
+      end)
+   end,
+})
+
+_G.AutoRebirth = false
+MainTab:CreateToggle({
+   Name = "Auto Rebirth 🔄",
+   CurrentValue = false,
+   Flag = "Rebirth",
+   Callback = function(Value)
+      _G.AutoRebirth = Value
+      task.spawn(function()
+          while _G.AutoRebirth do
+              pcall(function()
+                  game:GetService("ReplicatedStorage").Assets.Remotes.Tycoon.Rebirth:FireServer()
+              end)
+              task.wait(5)
+          end
+      end)
+   end,
+})
+
+-- === 3. Settings ===
+
+SettingTab:CreateSlider({
+   Name = "WalkSpeed 🏃‍♀️ (Locked)",
+   Range = {16, 250},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value)
+      WalkSpeedValue = Value
+   end,
+})
+
+local InfiniteJumpEnabled = false
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if InfiniteJumpEnabled and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+        player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+SettingTab:CreateToggle({
+   Name = "Infinite Jump 🤾‍♀️",
+   CurrentValue = false,
+   Callback = function(Value)
+      InfiniteJumpEnabled = Value
+   end,
+})
+
+SettingTab:CreateButton({
+   Name = "Enable Anti-AFK",
+   Callback = function()
+      local vu = game:GetService("VirtualUser")
+      player.Idled:Connect(function()
+         vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+         task.wait(1)
+         vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+      end)
+      Rayfield:Notify({Title = "Anti-AFK Enabled", Content = "AFK ✅", Duration = 5})
+   end,
+})
+
+Rayfield:LoadConfiguration()
