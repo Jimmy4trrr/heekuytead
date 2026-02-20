@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Sorcerer Tycoon | Boss Farm Edition",
+   Name = "Sorcerer Tycoon",
    LoadingTitle = "Loading Script...",
    LoadingSubtitle = "BY KUYRAISUS",
    ConfigurationSaving = { Enabled = false }
@@ -136,7 +136,7 @@ SettingTab:CreateButton({
          task.wait(1)
          vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
       end)
-      Rayfield:Notify({Title = "Anti-AFK Enabled", Content = "AFK ✅ | อย่าลืมเช็ค 2. ระบบค่าพลัง (Leaderstats)", Duration = 5})
+      Rayfield:Notify({Title = "Anti-AFK Enabled", Content = "AFK ✅", Duration = 5})
    end,
 })
 
