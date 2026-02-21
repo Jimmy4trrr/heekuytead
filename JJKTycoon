@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Sorcerer Tycoon (Triple Boss Edition)",
+   Name = "Sorcerer Tycoon",
    LoadingTitle = "Loading Script...",
    LoadingSubtitle = "BY KUYRAISUS",
    ConfigurationSaving = { Enabled = false }
@@ -64,7 +64,7 @@ MainTab:CreateToggle({ Name = "Auto Rebirth 🔄", CurrentValue = false, Callbac
 -- === 3. Auto Farm Boss (Priority Mode) ===
 _G.TriplePriorityFarm = false
 BossTab:CreateToggle({ 
-    Name = "Farm Priority (Gojo > Jogo > Toji) 🏆", 
+    Name = "Farm(Gojo > Jogo > Toji) 🏆", 
     CurrentValue = false, 
     Callback = function(V) _G.TriplePriorityFarm = V end 
 })
