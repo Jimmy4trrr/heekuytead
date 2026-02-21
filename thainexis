@@ -1,0 +1,201 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local VU = game:GetService("VirtualUser")
+local RS = game:GetService("RunService")
+
+local Window = Rayfield:CreateWindow({
+   Name = "🔅KUYRAISUS",
+   LoadingTitle = "System Initializing...",
+   ConfigurationSaving = { Enabled = true, FolderName = "OP_Configs" }
+})
+
+local _G = {
+    QuestMode = false,
+    FarmMode = false,
+    QuickKill = false,
+    Equip = false,
+    Targets = {},
+    Dist = CFrame.new(0, 0, 6) -- ระยะฟาร์ม 0 0 6 ตามที่สั่ง
+}
+
+-- // anti afk //
+local function AntiAFK()
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        VU:CaptureController()
+        VU:ClickButton2(Vector2.new(0,0))
+    end)
+end
+
+-- // auto equip weapon //
+spawn(function()
+    while task.wait(0.5) do
+        if _G.Equip then
+            local char = game.Players.LocalPlayer.Character
+            if char and not char:FindFirstChildOfClass("Tool") then
+                local tool = game.Players.LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+                if tool then char.Humanoid:EquipTool(tool) end
+            end
+        end
+    end
+end)
+
+-- // logic: safe warp to npc & auto quest //
+spawn(function()
+    while task.wait(0.1) do
+        if _G.QuestMode then
+            local p = game.Players.LocalPlayer
+            local questContainer = p.PlayerGui:FindFirstChild("Template Quest")
+            local npc = workspace.TalkNpc:FindFirstChild("Quest1000-Max")
+            
+            local hasQuest = false
+            if questContainer and questContainer:FindFirstChild("Quest") and questContainer.Quest.Visible == true then
+                hasQuest = true
+            end
+
+            if not hasQuest then
+                local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp and npc and npc:FindFirstChild("HumanoidRootPart") then
+                    -- วาร์ปแบบรักษาระยะห่าง 2 เมตร กัน NPC หาย
+                    hrp.CFrame = npc.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
+                    task.wait(0.2)
+                    local args = {
+                        "RequestQuest",
+                        npc,
+                        game:GetService("ReplicatedStorage").ModuleScript.Client.TalkNpc["Npc(s)"]["Quest1000-Max"].Quest
+                    }
+                    game:GetService("ReplicatedStorage").RemoteEvent.Quest:FireServer(unpack(args))
+                end
+            end
+        end
+    end
+end)
+
+-- // farm loop with fixed attack logic //
+spawn(function()
+    while task.wait() do
+        if _G.FarmMode then
+            local p = game.Players.LocalPlayer
+            local char = p.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if hrp then
+                for _, v in pairs(workspace.Monster:GetChildren()) do
+                    if v:IsA("Model") and table.find(_G.Targets, v.Name) then
+                        local hum = v:FindFirstChildOfClass("Humanoid")
+                        local mHrp = v:FindFirstChild("HumanoidRootPart") or v.PrimaryPart
+                        
+                        if hum and hum.Health > 0 and mHrp then
+                            repeat
+                                if not _G.FarmMode or hum.Health <= 0 then break end
+                                hrp.CFrame = mHrp.CFrame * _G.Dist
+                                
+                                -- คลิกโจมตี
+                                local weapon = char:FindFirstChildOfClass("Tool")
+                                if weapon then weapon:Activate() end
+                                VU:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                                
+                                task.wait()
+                            until hum.Health <= 0 or not _G.FarmMode
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- // instant kill (ultra speed) //
+RS.Heartbeat:Connect(function()
+    if _G.QuickKill then
+        for _, v in pairs(workspace.Monster:GetChildren()) do
+            if v:IsA("Model") then
+                local hum = v:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 and hum.Health < (hum.MaxHealth * 0.9999) then
+                    hum.Health = 0
+                end
+            end
+        end
+    end
+end)
+
+-- // TAB 1: COMBAT //
+local Main = Window:CreateTab("Combat", 4483362458)
+
+Main:CreateToggle({
+   Name = "Auto Quest (Shadow Student)",
+   CurrentValue = false,
+   Callback = function(v) _G.QuestMode = v end,
+})
+
+local MobDropdown = Main:CreateDropdown({
+   Name = "Select Mob",
+   Options = {"Refresh now"},
+   CurrentOption = {""},
+   MultipleOptions = true,
+   Callback = function(v) _G.Targets = v end,
+})
+
+Main:CreateButton({
+   Name = "Refresh Monster List",
+   Callback = function()
+       local list = {}
+       for _, v in pairs(workspace.Monster:GetChildren()) do
+           if v:IsA("Model") and not table.find(list, v.Name) then
+               table.insert(list, v.Name)
+           end
+       end
+       MobDropdown:Refresh(list)
+   end,
+})
+
+Main:CreateToggle({
+   Name = "Auto Farm (Warp)",
+   CurrentValue = false,
+   Callback = function(v) _G.FarmMode = v end,
+})
+
+Main:CreateToggle({
+   Name = "Instant Kill",
+   CurrentValue = false,
+   Callback = function(v) _G.QuickKill = v end,
+})
+
+-- // TAB 2: TELEPORTS (SPAWN SCANNER) //
+local TeleportTab = Window:CreateTab("Teleports", 4483362458)
+
+local IslandDropdown = TeleportTab:CreateDropdown({
+   Name = "Select Island/Spawn",
+   Options = {"Refresh to Load Spawns"},
+   CurrentOption = {""},
+   MultipleOptions = false,
+   Callback = function(v)
+       local selected = type(v) == "table" and v[1] or v
+       local target = workspace.SetSpawn:FindFirstChild(selected)
+       if target then
+           local hrp = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+           if hrp then
+               local targetPos = target.PrimaryPart or target:FindFirstChildOfClass("Part") or target:FindFirstChildOfClass("MeshPart")
+               if targetPos then
+                   hrp.CFrame = targetPos.CFrame * CFrame.new(0, 5, 0)
+               end
+           end
+       end
+   end,
+})
+
+TeleportTab:CreateButton({
+   Name = "Refresh Spawn Locations",
+   Callback = function()
+       local spawnList = {}
+       for _, v in pairs(workspace.SetSpawn:GetChildren()) do
+           if v:IsA("Model") then
+               table.insert(spawnList, v.Name)
+           end
+       end
+       IslandDropdown:Refresh(spawnList)
+   end,
+})
+
+-- // TAB 3: MISC //
+local Extra = Window:CreateTab("Misc", 4483362458)
+Extra:CreateToggle({ Name = "Auto Equip", CurrentValue = false, Callback = function(v) _G.Equip = v end })
+Extra:CreateButton({ Name = "Anti AFK", Callback = function() AntiAFK() end })
