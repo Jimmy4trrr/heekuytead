@@ -23,9 +23,9 @@ local function isCharacterReady()
 end
 
 local function getMyTycoon()
-    local tycoons = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Tycoons")
-    if not tycoons or SelectedTycoon == "" then return nil end
-    return tycoons:FindFirstChild(SelectedTycoon)
+    if SelectedTycoon == "" then return nil end
+    local tycoonsFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Tycoons")
+    return tycoonsFolder and tycoonsFolder:FindFirstChild(SelectedTycoon)
 end
 
 -- [Tabs]
@@ -38,7 +38,7 @@ local SettingTab = Window:CreateTab("Settings", 4483362458)
 -- === 1. Setup Tycoon ===
 ConfigTab:CreateDropdown({
    Name = "Select Your Character Tycoon ⚔",
-   Options = {"TycoonGojo", "TycoonYuji", "TycoonToji", "TycoonMegumi", "TycoonChoso", "TycoonNanami", "TycoonNobara", "TycoonTodo", "TycoonToge", "TycoonHanami", "TycoonJogo"},
+   Options = {"TycoonGojo", "TycoonYuji", "TycoonToji", "TycoonMegumi", "TycoonChoso", "TycoonNanami", "TycoonNobara", "TycoonTodo", "TycoonToge", "TycoonHanami", "TycoonJogo", "TycoonMaki"},
    CurrentOption = "",
    MultipleOptions = false,
    Callback = function(Option)
@@ -56,27 +56,77 @@ _G.AutoCollect = false
 MainTab:CreateToggle({ Name = "Auto Collect Money 💸", CurrentValue = false, Callback = function(V) _G.AutoCollect = V end })
 
 _G.AutoUpgrade = false
-MainTab:CreateToggle({ Name = "Auto Upgrade (No TP) 🚀", CurrentValue = false, Callback = function(V) _G.AutoUpgrade = V end })
+MainTab:CreateToggle({ Name = "Auto Upgrade (Turbo) 🚀", CurrentValue = false, Callback = function(V) _G.AutoUpgrade = V end })
 
 _G.AutoRebirth = false
 MainTab:CreateToggle({ Name = "Auto Rebirth 🔄", CurrentValue = false, Callback = function(V) _G.AutoRebirth = V end })
 
--- === 3. Auto Farm Boss (Priority Mode) ===
+-- === 3. Auto Farm Boss ===
 _G.TriplePriorityFarm = false
-BossTab:CreateToggle({ 
-    Name = "Farm(Gojo > Jogo > Toji) 🏆", 
-    CurrentValue = false, 
-    Callback = function(V) _G.TriplePriorityFarm = V end 
-})
+BossTab:CreateToggle({ Name = "Farm(Gojo > Jogo > Toji) 🏆", CurrentValue = false, Callback = function(V) _G.TriplePriorityFarm = V end })
 
--- === 4. Auto Skill & Key ===
+-- === [Loops System - แบบไวพิเศษ] ===
+
+-- Loop: Auto Upgrade (Speed Up!)
+task.spawn(function()
+    while true do
+        if _G.AutoUpgrade and isCharacterReady() then
+            pcall(function()
+                local myTycoon = getMyTycoon()
+                if myTycoon then
+                    local pFolder = myTycoon:FindFirstChild("Purchases") or myTycoon:FindFirstChild("Purshases")
+                    if pFolder then
+                        for _, folder in ipairs(pFolder:GetChildren()) do
+                            local b = folder:FindFirstChild("base", true) or folder:FindFirstChild("Base", true)
+                            if b and b:IsA("BasePart") and b.Transparency < 1 then
+                                -- ใช้การวาร์ป TouchInterest แบบต่อเนื่องเพื่อความไว
+                                firetouchinterest(player.Character.HumanoidRootPart, b, 0)
+                                firetouchinterest(player.Character.HumanoidRootPart, b, 1)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.1) -- ปรับให้ไวขึ้นมากแต่ไม่ค้าง
+    end
+end)
+
+-- Loop: Auto Collect & Remotes
+task.spawn(function()
+    while true do
+        if isCharacterReady() then
+            if _G.AutoCollect then
+                local myTycoon = getMyTycoon()
+                if myTycoon then
+                    for _, v in ipairs(myTycoon:GetDescendants()) do
+                        if (v.Name == "Collector" or v.Name == "Collect") and v:IsA("BasePart") then
+                            firetouchinterest(player.Character.HumanoidRootPart, v, 0)
+                            firetouchinterest(player.Character.HumanoidRootPart, v, 1)
+                        end
+                    end
+                end
+            end
+            
+            if _G.AutoSkill and SelectedTycoon ~= "" then
+                local charName = SelectedTycoon:gsub("Tycoon", "")
+                game:GetService("ReplicatedStorage").Assets.Remotes.Skills.SKill:FireServer(charName, "M1_1")
+            end
+            
+            if _G.AutoRebirth then 
+                game:GetService("ReplicatedStorage").Assets.Remotes.Tycoon.Rebirth:FireServer() 
+            end
+        end
+        task.wait(0.2) -- ความเร็วในการเก็บเงินและเช็คสกิล
+    end
+end)
+
+-- === ฟังก์ชันอื่นๆ คงเดิมเพื่อความเสถียร ===
 _G.AutoSkill = false
 SkillTab:CreateToggle({ Name = "Auto M1 Attack ⚡", CurrentValue = false, Callback = function(V) _G.AutoSkill = V end })
-
 _G.AutoPressKeys = false
 SkillTab:CreateToggle({ Name = "Auto Press Skills (1-0) ⌨", CurrentValue = false, Callback = function(V) _G.AutoPressKeys = V end })
 
--- === 5. Settings ===
 SettingTab:CreateSlider({ Name = "WalkSpeed 🏃‍♀️", Range = {16, 250}, Increment = 1, CurrentValue = 16, Callback = function(V) WalkSpeedValue = V end })
 SettingTab:CreateToggle({ Name = "Infinite Jump 🦘", CurrentValue = false, Callback = function(V) _G.InfJump = V end })
 SettingTab:CreateButton({ Name = "Enable Anti-AFK", Callback = function()
@@ -89,114 +139,34 @@ SettingTab:CreateButton({ Name = "Enable Anti-AFK", Callback = function()
     Rayfield:Notify({Title = "Anti-AFK Enabled", Content = "Online ✅", Duration = 5})
 end})
 
--- === [Loops System] ===
-
--- Loop: ฟาร์มบอส 3 ตัวตามลำดับความสำคัญและการเก็บของ
 task.spawn(function()
     while task.wait(0.1) do
         if _G.TriplePriorityFarm and isCharacterReady() then
             pcall(function()
                 local hrp = player.Character.HumanoidRootPart
-                
-                -- [[ ส่วนที่ 1: เช็ค Drops (เก็บของก่อนตีเสมอ) ]]
                 local wDrops = worldDrops:GetChildren()
                 local mDrops = metroDrops:GetChildren()
-
-                if #wDrops > 0 then -- เก็บของ Gojo/Jogo (WorldBoss)
+                if #wDrops > 0 then 
                     for _, drop in pairs(wDrops) do
                         local prompt = drop:FindFirstChild("Prompt") or drop:FindFirstChildOfClass("ProximityPrompt")
-                        if hrp and prompt then
-                            hrp.CFrame = drop:IsA("Model") and drop:GetModelCFrame() or (drop:IsA("BasePart") and drop.CFrame)
-                            task.wait(0.15)
-                            fireproximityprompt(prompt)
-                        end
+                        if hrp and prompt then hrp.CFrame = drop:IsA("Model") and drop:GetModelCFrame() or drop.CFrame task.wait(0.15) fireproximityprompt(prompt) end
                     end
-                elseif #mDrops > 0 then -- เก็บของ Toji (Metro)
+                elseif #mDrops > 0 then
                     for _, drop in pairs(mDrops) do
                         local prompt = drop:FindFirstChild("Prompt") or drop:FindFirstChildOfClass("ProximityPrompt")
-                        if hrp and prompt then
-                            hrp.CFrame = drop:IsA("Model") and drop:GetModelCFrame() or (drop:IsA("BasePart") and drop.CFrame)
-                            task.wait(0.15)
-                            fireproximityprompt(prompt)
-                        end
+                        if hrp and prompt then hrp.CFrame = drop:IsA("Model") and drop:GetModelCFrame() or drop.CFrame task.wait(0.15) fireproximityprompt(prompt) end
                     end
                 else
-                    -- [[ ส่วนที่ 2: เช็คตัวบอสตาม Priority (Gojo > Jogo > Toji) ]]
                     local gojo, jogo, toji = nil, nil, nil
-
-                    -- หา Gojo (WorldBoss)
-                    for _, b in pairs(worldBosses:GetChildren()) do
-                        if b:GetAttribute("CharacterName") == "Gojo" and b.Humanoid.Health > 0 then gojo = b break end
-                    end
-                    -- หา Jogo (WorldBoss)
-                    for _, b in pairs(worldBosses:GetChildren()) do
-                        if (b.Name:find("Jogo") or b:GetAttribute("CharacterName") == "Jogo") and b.Humanoid.Health > 0 then jogo = b break end
-                    end
-                    -- หา Toji (Metro)
-                    for _, b in pairs(metroBosses:GetChildren()) do
-                        if b:GetAttribute("CharacterName") == "Toji" and b.Humanoid.Health > 0 then toji = b break end
-                    end
-
-                    -- วาร์ปไปตีตามลำดับ
-                    if gojo then
-                        hrp.CFrame = gojo.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7)
-                    elseif jogo then
-                        hrp.CFrame = jogo.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7)
-                    elseif toji then
-                        hrp.CFrame = toji.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7)
-                    end
+                    for _, b in pairs(worldBosses:GetChildren()) do if b:GetAttribute("CharacterName") == "Gojo" and b.Humanoid.Health > 0 then gojo = b break end end
+                    for _, b in pairs(worldBosses:GetChildren()) do if (b.Name:find("Jogo") or b:GetAttribute("CharacterName") == "Jogo") and b.Humanoid.Health > 0 then jogo = b break end end
+                    for _, b in pairs(metroBosses:GetChildren()) do if b:GetAttribute("CharacterName") == "Toji" and b.Humanoid.Health > 0 then toji = b break end end
+                    if gojo then hrp.CFrame = gojo.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7)
+                    elseif jogo then hrp.CFrame = jogo.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7)
+                    elseif toji then hrp.CFrame = toji.HumanoidRootPart.CFrame * CFrame.new(0, 0, 7) end
                 end
             end)
         end
-    end
-end)
-
--- ฟังก์ชันเสริม (No-TP Upgrade, Auto Skill, Rebirth, etc.)
-task.spawn(function()
-    while true do
-        if _G.AutoUpgrade and isCharacterReady() then
-            pcall(function()
-                local myTycoon = getMyTycoon()
-                local purchases = myTycoon and (myTycoon:FindFirstChild("Purchases") or myTycoon:FindFirstChild("Purshases"))
-                if purchases then
-                    for _, folder in pairs(purchases:GetChildren()) do
-                        local b = folder:FindFirstChild("base", true)
-                        if b and b:IsA("BasePart") and b.Transparency < 1 then
-                            firetouchinterest(player.Character.HumanoidRootPart, b, 0)
-                            task.wait()
-                            firetouchinterest(player.Character.HumanoidRootPart, b, 1)
-                        end
-                    end
-                end
-            end)
-        end
-        task.wait(1.5)
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if isCharacterReady() then
-            if _G.AutoSkill and SelectedTycoon ~= "" then
-                local charName = SelectedTycoon:gsub("Tycoon", "")
-                game:GetService("ReplicatedStorage").Assets.Remotes.Skills.SKill:FireServer(charName, "M1_1")
-            end
-            if _G.AutoRebirth then game:GetService("ReplicatedStorage").Assets.Remotes.Tycoon.Rebirth:FireServer() end
-            if _G.AutoCollect then
-                local myTycoon = getMyTycoon()
-                local base = myTycoon and myTycoon:FindFirstChild("Base")
-                if base then
-                    for _, v in pairs(base:GetDescendants()) do
-                        if v.Name == "Collector" and v:IsA("BasePart") then
-                            firetouchinterest(player.Character.HumanoidRootPart, v, 0)
-                            task.wait()
-                            firetouchinterest(player.Character.HumanoidRootPart, v, 1)
-                        end
-                    end
-                end
-            end
-        end
-        task.wait(0.3)
     end
 end)
 
@@ -207,9 +177,7 @@ task.spawn(function()
         if _G.AutoPressKeys and isCharacterReady() then
             for _, key in ipairs(keys) do
                 if not _G.AutoPressKeys then break end
-                vim:SendKeyEvent(true, key, false, game)
-                task.wait(0.05)
-                vim:SendKeyEvent(false, key, false, game)
+                vim:SendKeyEvent(true, key, false, game) task.wait(0.05) vim:SendKeyEvent(false, key, false, game)
             end
         end
         task.wait(0.4)
@@ -217,9 +185,7 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-    while task.wait(0.1) do
-        if isCharacterReady() then player.Character.Humanoid.WalkSpeed = WalkSpeedValue end
-    end
+    while task.wait(0.1) do if isCharacterReady() then player.Character.Humanoid.WalkSpeed = WalkSpeedValue end end
 end)
 
 game:GetService("UserInputService").JumpRequest:Connect(function()
