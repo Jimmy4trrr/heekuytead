@@ -11,6 +11,7 @@ local player = game.Players.LocalPlayer
 local SelectedTycoon = "" 
 local WalkSpeedValue = 16 
 _G.InfJump = false 
+_G.ChangeName = false -- ตัวแปรใหม่สำหรับระบบเปลี่ยนชื่อ
 
 -- === Path Setup ===
 local metroDrops = workspace.Map.Boss.Metro.Drops
@@ -65,9 +66,28 @@ MainTab:CreateToggle({ Name = "Auto Rebirth 🔄", CurrentValue = false, Callbac
 _G.TriplePriorityFarm = false
 BossTab:CreateToggle({ Name = "Farm(Gojo > Jogo > Toji) 🏆", CurrentValue = false, Callback = function(V) _G.TriplePriorityFarm = V end })
 
--- === [Loops System - แบบไวพิเศษ] ===
+-- === [Loops System] ===
 
--- Loop: Auto Upgrade (Speed Up!)
+-- Loop: Change Name System (New!)
+task.spawn(function()
+    while true do
+        if _G.ChangeName then
+            pcall(function()
+                -- ตรวจจับชื่อจากตัวผู้เล่นที่รันสคริปต์ (ตรวจจับ ZENGF000 อัตโนมัติ)
+                local charPath = workspace.Characters:FindFirstChild(player.Name)
+                if charPath and charPath:FindFirstChild("Head") and charPath.Head:FindFirstChild("HealthGUI") then
+                    local nameLabel = charPath.Head.HealthGUI:FindFirstChild("CharacterName")
+                    if nameLabel and nameLabel.Text ~= "Sorcerer Tycoon OP" then
+                        nameLabel.Text = "Sorcerer Tycoon OP"
+                    end
+                end
+            end)
+        end
+        task.wait(1) -- เช็คทุก 1 วินาที (ไม่กินสเปคและรองรับการเกิดใหม่)
+    end
+end)
+
+-- Loop: Auto Upgrade
 task.spawn(function()
     while true do
         if _G.AutoUpgrade and isCharacterReady() then
@@ -79,7 +99,6 @@ task.spawn(function()
                         for _, folder in ipairs(pFolder:GetChildren()) do
                             local b = folder:FindFirstChild("base", true) or folder:FindFirstChild("Base", true)
                             if b and b:IsA("BasePart") and b.Transparency < 1 then
-                                -- ใช้การวาร์ป TouchInterest แบบต่อเนื่องเพื่อความไว
                                 firetouchinterest(player.Character.HumanoidRootPart, b, 0)
                                 firetouchinterest(player.Character.HumanoidRootPart, b, 1)
                             end
@@ -88,7 +107,7 @@ task.spawn(function()
                 end
             end)
         end
-        task.wait(0.1) -- ปรับให้ไวขึ้นมากแต่ไม่ค้าง
+        task.wait(0.1)
     end
 end)
 
@@ -117,15 +136,24 @@ task.spawn(function()
                 game:GetService("ReplicatedStorage").Assets.Remotes.Tycoon.Rebirth:FireServer() 
             end
         end
-        task.wait(0.2) -- ความเร็วในการเก็บเงินและเช็คสกิล
+        task.wait(0.2)
     end
 end)
 
--- === ฟังก์ชันอื่นๆ คงเดิมเพื่อความเสถียร ===
+-- === Settings Tab Features ===
 _G.AutoSkill = false
 SkillTab:CreateToggle({ Name = "Auto M1 Attack ⚡", CurrentValue = false, Callback = function(V) _G.AutoSkill = V end })
 _G.AutoPressKeys = false
 SkillTab:CreateToggle({ Name = "Auto Press Skills (1-0) ⌨", CurrentValue = false, Callback = function(V) _G.AutoPressKeys = V end })
+
+-- เพิ่มปุ่มเปิดปิดเปลี่ยนชื่อที่นี่
+SettingTab:CreateToggle({
+   Name = "Change Display Name 🏷️",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.ChangeName = Value
+   end
+})
 
 SettingTab:CreateSlider({ Name = "WalkSpeed 🏃‍♀️", Range = {16, 250}, Increment = 1, CurrentValue = 16, Callback = function(V) WalkSpeedValue = V end })
 SettingTab:CreateToggle({ Name = "Infinite Jump 🦘", CurrentValue = false, Callback = function(V) _G.InfJump = V end })
@@ -139,6 +167,7 @@ SettingTab:CreateButton({ Name = "Enable Anti-AFK", Callback = function()
     Rayfield:Notify({Title = "Anti-AFK Enabled", Content = "Online ✅", Duration = 5})
 end})
 
+-- Boss Farm Loop
 task.spawn(function()
     while task.wait(0.1) do
         if _G.TriplePriorityFarm and isCharacterReady() then
@@ -170,6 +199,7 @@ task.spawn(function()
     end
 end)
 
+-- Key Press Loop
 task.spawn(function()
     local vim = game:GetService("VirtualInputManager")
     local keys = {Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five, Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine, Enum.KeyCode.Zero}
@@ -184,6 +214,7 @@ task.spawn(function()
     end
 end)
 
+-- Speed Loop
 task.spawn(function()
     while task.wait(0.1) do if isCharacterReady() then player.Character.Humanoid.WalkSpeed = WalkSpeedValue end end
 end)
