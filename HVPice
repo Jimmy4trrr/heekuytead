@@ -1,45 +1,49 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "🚩 HEAVEN PIECE | FULL OPTIMIZED",
-   LoadingTitle = "Restoring All Functions...",
+   Name = "🚩 HEAVEN PIECE",
+   LoadingTitle = "Performance...",
    LoadingSubtitle = "by KUYRAISUS",
    ConfigurationSaving = { Enabled = true, FolderName = "KuyraisusConfig", FileName = "HeavenPiece" }
 })
 
--- กำหนดค่าเริ่มต้นให้ครบ
 _G.KillAuraAny = false
 _G.InfAFK = false
 _G.NoCD = { M1=false, Z=false, X=false, C=false, V=false, B=false, N=false, F=false }
 _G.AntiLag = true
 
--- สร้าง Tab
 local MainTab = Window:CreateTab("Main Features", 4483362458)
-local CombatTab = Window:CreateTab("Combat Custom", 4483362458)
+local CombatTab = Window:CreateTab("Auto Combat", 4483362458)
 local MisTab = Window:CreateTab("Misc/Settings", 4483362458)
 
 MainTab:CreateSection("Monster Destroyer")
 
--- 2. ระบบค่าพลัง (Leaderstats) - แจ้งเตือนตามเงื่อนไขที่ตั้งไว้ครับ
+-- 2. ระบบค่าพลัง (Leaderstats)
 MainTab:CreateToggle({
-   Name = "OP KILL (Smart & Smooth)",
+   Name = "OP KILL",
    CurrentValue = false,
    Callback = function(v) _G.KillAuraAny = v end,
 })
 
-CombatTab:CreateSection("Skill No Cooldown")
+CombatTab:CreateSection("Skill No Cooldown Not work game Fix")
 
-local skillKeys = {"M1", "Z", "X", "C", "V", "B", "N", "F"}
+CombatTab:CreateToggle({
+   Name = "Auto Click (M1)",
+   CurrentValue = false,
+   Callback = function(v) _G.NoCD.M1 = v end,
+})
+
+local skillKeys = {"Z", "X", "C", "V", "B", "N", "F"}
 for _, key in pairs(skillKeys) do
     CombatTab:CreateToggle({
-       Name = "Fast " .. key,
+       Name = "Auto Press " .. key,
        CurrentValue = false,
        Callback = function(v) _G.NoCD[key] = v end,
     })
 end
 
 MisTab:CreateToggle({
-   Name = "Anti-Lag (Remove Effects)",
+   Name = "Anti-Lag",
    CurrentValue = true,
    Callback = function(v) _G.AntiLag = v end,
 })
@@ -54,7 +58,49 @@ MisTab:CreateToggle({
 -- [[ LOGIC SYSTEM ]] --
 ---
 
--- 1. ระบบ OP KILL (แบบลดอาการกระตุก)
+local VIM = game:GetService("VirtualInputManager")
+
+-- ฟังก์ชันจำลองการกดปุ่มคีย์บอร์ด
+local function PressKey(key)
+    local keyCode = Enum.KeyCode[key]
+    VIM:SendKeyEvent(true, keyCode, false, game)
+    task.wait(0.01)
+    VIM:SendKeyEvent(false, keyCode, false, game)
+end
+
+-- 1. ระบบ Auto Click M1 (0.1s)
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if _G.NoCD.M1 then
+            pcall(function()
+                VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                task.wait(0.01)
+                VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+            end)
+        end
+    end
+end)
+
+-- 2. ระบบ Auto Press Skills (จำลองการกดคีย์บอร์ด Z, X, C...)
+task.spawn(function()
+    while true do
+        task.wait(0.2) -- หน่วงเวลาเล็กน้อยเพื่อให้ไม่รัวจนเกมค้าง
+        pcall(function()
+            local lp = game.Players.LocalPlayer
+            if lp.Character and lp.Character.Humanoid.Health > 0 then
+                for _, k in pairs({"Z", "X", "C", "V", "B", "N", "F"}) do
+                    if _G.NoCD[k] then
+                        PressKey(k)
+                        task.wait(0.05) -- เว้นช่วงระหว่างปุ่ม
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- 3. ระบบ OP KILL (ฆ่ามอนเมื่อโดนดาเมจ - ตรวจจับตามโฟลเดอร์ในรูปภาพ)
 local function MonitorMonster(monster)
     if monster:IsA("Model") then
         local hum = monster:WaitForChild("Humanoid", 5)
@@ -68,64 +114,27 @@ local function MonitorMonster(monster)
     end
 end
 
--- สแกนมอนสเตอร์ใน workspace.Mod ทุกโฟลเดอร์ย่อย
+-- เริ่มการดักจับมอนสเตอร์ใน workspace.Mod
 for _, folder in pairs(workspace.Mod:GetChildren()) do
-    -- ตรวจสอบตัวที่มีอยู่แล้ว
-    for _, m in pairs(folder:GetChildren()) do
-        task.spawn(MonitorMonster, m)
-    end
-    -- ดักจับตัวที่เกิดใหม่
-    folder.ChildAdded:Connect(function(child)
-        task.spawn(MonitorMonster, child)
-    end)
+    for _, m in pairs(folder:GetChildren()) do task.spawn(MonitorMonster, m) end
+    folder.ChildAdded:Connect(function(child) task.spawn(MonitorMonster, child) end)
 end
 
--- 2. ระบบ No Cooldown (กลับมาครบทุกปุ่ม)
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        pcall(function()
-            local lp = game.Players.LocalPlayer
-            if lp.Character then
-                local combat = lp.Character:FindFirstChild("Combat")
-                if combat then
-                    -- Fast M1
-                    if _G.NoCD.M1 and combat:FindFirstChild("Combo") then 
-                        combat.Combo.C0:FireServer() 
-                    end
-                    -- Fast Skills
-                    local skillEv = combat:FindFirstChild("Skill") and combat.Skill:FindFirstChild("SkillEvent")
-                    if skillEv then
-                        for _, k in pairs({"Z", "X", "C", "V", "B", "N", "F"}) do
-                            if _G.NoCD[k] then skillEv:FireServer(k) end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-end)
-
--- 3. ระบบ Anti-Lag
+-- 4. ระบบ Anti-Lag & Anti-AFK
 task.spawn(function()
     while true do
         task.wait(5)
         if _G.AntiLag then
-            pcall(function()
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Explosion") then
-                        v.Enabled = false
-                    end
-                end
-            end)
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("ParticleEmitter") or v:IsA("Trail") then v.Enabled = false end
+            end
         end
     end
 end)
 
--- 4. ระบบ Anti-AFK
 game:GetService("Players").LocalPlayer.Idled:Connect(function()
     if _G.InfAFK then
-        game:GetService("VirtualUser"):CaptureController()
-        game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+        VIM:CaptureController()
+        VIM:ClickButton2(Vector2.new())
     end
 end)
