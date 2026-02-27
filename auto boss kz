@@ -1,0 +1,226 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = " KAIZEN | AFK Boss World",
+   LoadingTitle = "รอก่อนดิ I SUS",
+   LoadingSubtitle = "by KUYRAISUS",
+   ConfigurationSaving = { Enabled = false }
+})
+
+-- [[ Variables & States ]] --
+_G.AutoFarm = false
+_G.AutoClick = false
+_G.AutoEquip = false
+_G.SelectedWeapon = ""
+_G.WalkSpeed = 16
+_G.InfJump = false
+_G.AntiAFK = true
+
+-- Skill States
+_G.SkillZ = false
+_G.SkillX = false
+_G.SkillC = false
+_G.SkillV = false
+_G.SkillR = false
+
+-- นำ IroncladGnasher ออกจากลิสต์เป้าหมาย
+local TargetBosses = {"Uraume", "Eso", "Gojo", "Sukuna", "Itadori"}
+
+-- นำพิกัดของ IroncladGnasher ออกจากระบบวนลูปหาบอส
+local BossSpawns = {
+    {Name = "Sukuna", Pos = Vector3.new(803.742, 181.088, 3146.111)},
+    {Name = "Itadori", Pos = Vector3.new(-773.649, 171.155, 2600.145)},
+    {Name = "Eso", Pos = Vector3.new(2029.966, 109.607, -2212.794)},
+    {Name = "Uraume", Pos = Vector3.new(-61.477, 466.903, -1312.287)},
+    {Name = "Gojo", Pos = Vector3.new(1933.592, 157.282, 880.190)}
+}
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local currentSpawnIndex = 1
+local lastCycleTime = 0
+
+-- [[ Helper Functions ]] --
+local function GetWeapons()
+    local weapons = {}
+    for _, item in pairs(game.Players.LocalPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(weapons, item.Name)
+        end
+    end
+    return weapons
+end
+
+-- [[ Tabs ]] --
+local MainTab = Window:CreateTab("Auto Farm", 4483345998)
+local SkillTab = Window:CreateTab("Auto Skills", 4483345998)
+local SettingsTab = Window:CreateTab("Misc & Settings", 4483345998)
+
+-- [[ UI Elements ]] --
+
+-- Main Tab: Weapon & Farm
+local WeaponDropdown = MainTab:CreateDropdown({
+   Name = "Select Weapon",
+   Options = GetWeapons(),
+   CurrentOption = "",
+   MultipleOptions = false,
+   Callback = function(Option) _G.SelectedWeapon = Option[1] end,
+})
+
+MainTab:CreateButton({
+   Name = "Refresh Weapons",
+   Callback = function()
+      local newWeapons = GetWeapons()
+      WeaponDropdown:Set(newWeapons)
+      Rayfield:Notify({Title = "Success", Content = "Weapon list updated!", Duration = 2})
+   end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Equip",
+    CurrentValue = false,
+    Callback = function(Value) _G.AutoEquip = Value end,
+ })
+
+MainTab:CreateToggle({
+   Name = "Auto Farm Boss",
+   CurrentValue = false,
+   Callback = function(Value) _G.AutoFarm = Value end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Attack",
+    CurrentValue = false,
+    Callback = function(Value) _G.AutoClick = Value end,
+ })
+
+-- Skill Tab
+local keys = {"Z", "X", "C", "V", "R"}
+for _, key in pairs(keys) do
+    SkillTab:CreateToggle({
+        Name = "Use Skill "..key,
+        CurrentValue = false,
+        Callback = function(V) _G["Skill"..key] = V end
+    })
+    task.spawn(function()
+        while task.wait(1.5) do
+            if _G["Skill"..key] then
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode[key], false, game)
+                task.wait(0.1)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode[key], false, game)
+            end
+        end
+    end)
+end
+
+-- Settings Tab
+SettingsTab:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 300},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value) _G.WalkSpeed = Value end,
+})
+
+SettingsTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Callback = function(Value) _G.InfJump = Value end,
+})
+
+SettingsTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = true,
+    Callback = function(Value) _G.AntiAFK = Value end,
+})
+
+-- [[ Logic Loops ]] --
+
+-- WalkSpeed & Auto Farm Loop
+task.spawn(function()
+    while task.wait(0.1) do
+        local char = game.Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = _G.WalkSpeed end
+
+        if _G.AutoFarm and char and char:FindFirstChild("HumanoidRootPart") then
+            pcall(function()
+                local playerHRP = char.HumanoidRootPart
+                
+                local function GetTarget()
+                    local folder = workspace:FindFirstChild("Enemies") and workspace.Enemies:FindFirstChild("Bosses")
+                    if folder then
+                        for _, boss in pairs(folder:GetChildren()) do
+                            local attr = boss:GetAttribute("EnemyName")
+                            local bHRP = boss:FindFirstChild("HumanoidRootPart")
+                            local bHum = boss:FindFirstChildOfClass("Humanoid")
+                            if attr and bHRP and bHum and bHum.Health > 0 then
+                                for _, name in pairs(TargetBosses) do
+                                    if string.find(string.lower(attr), string.lower(name)) then return bHRP end
+                                end
+                            end
+                        end
+                    end
+                    return nil
+                end
+
+                local target = GetTarget()
+                if target then
+                    playerHRP.CFrame = target.CFrame * CFrame.new(0, 0, 5)
+                    lastCycleTime = tick()
+                else
+                    if tick() - lastCycleTime >= 8 then
+                        playerHRP.CFrame = CFrame.new(BossSpawns[currentSpawnIndex].Pos + Vector3.new(0, 20, 0))
+                        currentSpawnIndex = (currentSpawnIndex % #BossSpawns) + 1
+                        lastCycleTime = tick()
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto Equip Loop
+task.spawn(function()
+    while task.wait(1) do
+        if _G.AutoEquip and _G.SelectedWeapon ~= "" then
+            pcall(function()
+                local player = game.Players.LocalPlayer
+                local char = player.Character
+                if char and not char:FindFirstChild(_G.SelectedWeapon) then
+                    local tool = player.Backpack:FindFirstChild(_G.SelectedWeapon)
+                    if tool then char.Humanoid:EquipTool(tool) end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto Click Loop
+task.spawn(function()
+    while task.wait(0.2) do
+        if _G.AutoClick then
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(0.1)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end
+    end
+end)
+
+-- Infinite Jump Logic
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if _G.InfJump then
+        local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+-- Anti AFK Logic
+game.Players.LocalPlayer.Idled:Connect(function()
+    if _G.AntiAFK then
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
+        task.wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+    end
+end)
+
+Rayfield:Notify({Title = "Ready!", Content = "เอา IroncladGnasher ออกเรียบร้อย อย่าลืมเช็ค 2. ระบบค่าพลัง (Leaderstats)!", Duration = 5})
