@@ -1,7 +1,7 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "BY KUYRAISUS",
+    Title = "KUYRAISUS HUB",
     SubTitle = "Dudung Universe",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -57,7 +57,7 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe then
-        if input.KeyCode == Enum.KeyCode.LeftControl then -- Fixed ==
+        if input.KeyCode == Enum.KeyCode.LeftControl then
             Window:Minimize()
         elseif input.KeyCode == Enum.KeyCode.K then
             ScreenGui.Enabled = not ScreenGui.Enabled
@@ -109,7 +109,7 @@ end
 -------------------------------------------------------------------------------
 -- [ Main Tab ]
 -------------------------------------------------------------------------------
-Tabs.Main:AddParagraph({Title = "Combat Settings", Content = "Automatic monster farming configuration."})
+Tabs.Main:AddParagraph({Title = "Combat Settings", Content = "Configure automatic monster farming."})
 
 local WeaponDropdown = Tabs.Main:AddDropdown("WeaponSelect", {
     Title = "Select Weapon",
@@ -118,7 +118,7 @@ local WeaponDropdown = Tabs.Main:AddDropdown("WeaponSelect", {
 })
 
 local MonsterDropdown = Tabs.Main:AddDropdown("MonsterSelect", {
-    Title = "Select Monsters",
+    Title = "Select Target Monsters",
     Values = GetMonsters(),
     Multi = true, Default = {},
 })
@@ -137,25 +137,25 @@ local FarmDistSlider = Tabs.Main:AddSlider("FarmDistance", {
 })
 
 Tabs.Main:AddToggle("AutoFarm", {Title = "Start Auto Farm (Selected)", Default = false})
-Tabs.Main:AddToggle("AutoFarmAll", {Title = "Auto Farm All Monsters (ตีทุกตัว)", Default = false})
+Tabs.Main:AddToggle("AutoFarmAll", {Title = "Auto Farm All Monsters", Default = false})
 Tabs.Main:AddToggle("AutoAtk", {Title = "Auto Attack", Default = false})
 Tabs.Main:AddToggle("InstaKill89", {Title = "InstaKill (Boss & Raid)", Default = false})
-Tabs.Main:AddToggle("InstaKill99", {Title = "InstaKill (99% Mon)", Default = false})
+Tabs.Main:AddToggle("InstaKill99", {Title = "InstaKill (99% Threshold)", Default = false})
 
 -------------------------------------------------------------------------------
 -- [ Raid Tab ]
 -------------------------------------------------------------------------------
-Tabs.Raid:AddParagraph({Title = "Raid Automation", Content = "Raid"})
+Tabs.Raid:AddParagraph({Title = "Raid Automation", Content = "Automate Raid entry and combat."})
 Tabs.Raid:AddToggle("AutoRaid", {Title = "Auto Start Raid", Default = false})
-Tabs.Raid:AddToggle("AutoFarmRaid", {Title = "Auto Farm Monsters in Raid", Default = false})
+Tabs.Raid:AddToggle("AutoFarmRaid", {Title = "Auto Farm Raid Monsters", Default = false})
 
 -------------------------------------------------------------------------------
 -- [ Boss Tab ]
 -------------------------------------------------------------------------------
-Tabs.Boss:AddParagraph({Title = "Boss Spawner & Farm", Content = "Automated boss management system."})
+Tabs.Boss:AddParagraph({Title = "Boss Management", Content = "Automated boss spawner and farming."})
 
 local BossSelectDropdown = Tabs.Boss:AddDropdown("BossToSpawn", {
-    Title = "Select Boss to Spawn",
+    Title = "Select Bosses to Spawn",
     Values = {"Night Blade Boss", "Asakusa Boss", "Getsuga Boss", "Hakari Boss", "Limitless Boss", "Shadow Boss", "Vasto Lorde Boss"},
     Multi = true, 
     Default = {"Shadow Boss"},
@@ -174,7 +174,7 @@ Tabs.Boss:AddToggle("AutoHaki", {Title = "Auto Haki (On Respawn)", Default = tru
 -- [ Teleport Tab ]
 -------------------------------------------------------------------------------
 local CraftDropdown = Tabs.TP:AddDropdown("CraftSelect", {
-    Title = "Craft Abilities",
+    Title = "Crafting Stations",
     Values = GetFolderItems(workspace.Map:FindFirstChild("CraftAbillities")),
     Callback = function(Value)
         local target = workspace.Map.CraftAbillities:FindFirstChild(Value)
@@ -183,10 +183,10 @@ local CraftDropdown = Tabs.TP:AddDropdown("CraftSelect", {
         end
     end
 })
-Tabs.TP:AddButton({ Title = "Refresh Craft", Callback = function() CraftDropdown:SetValues(GetFolderItems(workspace.Map.CraftAbillities)) end })
+Tabs.TP:AddButton({ Title = "Refresh Stations", Callback = function() CraftDropdown:SetValues(GetFolderItems(workspace.Map.CraftAbillities)) end })
 
 local NPCDropdown = Tabs.TP:AddDropdown("NPCSelect", {
-    Title = "NPCs",
+    Title = "NPC Locations",
     Values = GetFolderItems(workspace.Map:FindFirstChild("NPC")),
     Callback = function(Value)
         local target = workspace.Map.NPC:FindFirstChild(Value)
@@ -195,19 +195,40 @@ local NPCDropdown = Tabs.TP:AddDropdown("NPCSelect", {
         end
     end
 })
-Tabs.TP:AddButton({ Title = "Refresh NPC", Callback = function() NPCDropdown:SetValues(GetFolderItems(workspace.Map.NPC)) end })
+Tabs.TP:AddButton({ Title = "Refresh NPCs", Callback = function() NPCDropdown:SetValues(GetFolderItems(workspace.Map.NPC)) end })
 
 -------------------------------------------------------------------------------
 -- [ Settings Tab ]
 -------------------------------------------------------------------------------
-local SpeedSlider = Tabs.Settings:AddSlider("WalkSpeed", {Title = "Walk Speed", Default = 16, Min = 16, Max = 250, Rounding = 1})
-local InfAFKToggle = Tabs.Settings:AddToggle("InfAFK", {Title = "Infinite AFK", Default = true})
-local InfJumpToggle = Tabs.Settings:AddToggle("InfJump", {Title = "Infinite Jump", Default = false})
-local AutoResetToggle = Tabs.Settings:AddToggle("AutoReset", {Title = "Auto Reset (Every 60s)", Default = false})
+Tabs.Settings:AddParagraph({Title = "Automation & Shop", Content = "Purchasing and Player tweaks."})
+
+Tabs.Settings:AddToggle("AutoBuyRace", {Title = "Auto Buy Race Reroll", Default = false})
+local BuySpeedSlider = Tabs.Settings:AddSlider("BuySpeed", {
+    Title = "Buy Delay (Seconds)",
+    Default = 0.5, Min = 0.1, Max = 5, Rounding = 1,
+})
+
+Tabs.Settings:AddSlider("WalkSpeed", {Title = "Walk Speed", Default = 16, Min = 16, Max = 250, Rounding = 1})
+Tabs.Settings:AddToggle("InfAFK", {Title = "Infinite AFK (Anti-Idle)", Default = true})
+Tabs.Settings:AddToggle("InfJump", {Title = "Infinite Jump", Default = false})
+Tabs.Settings:AddToggle("AutoReset", {Title = "Auto Reset (Every 60s)", Default = false})
 
 -------------------------------------------------------------------------------
--- [ Core Functionality & Loops ]
+-- [ Loops & Core Functions ]
 -------------------------------------------------------------------------------
+
+-- Auto Buy Race Loop
+task.spawn(function()
+    while true do
+        if Options.AutoBuyRace.Value then
+            pcall(function()
+                local args = {"Buy", "Race Reroll", "1"}
+                ReplicatedStorage:WaitForChild("Events"):WaitForChild("Trader"):FireServer(unpack(args))
+            end)
+        end
+        task.wait(Options.BuySpeed.Value)
+    end
+end)
 
 local function TeleportTo(cframe)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -275,7 +296,7 @@ task.spawn(function()
     end
 end)
 
--- Unified Auto Farm Logic (Selected / All / Raid)
+-- Auto Farm Logic
 task.spawn(function()
     while task.wait(0.1) do
         if Options.AutoFarm.Value or Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
@@ -294,8 +315,6 @@ task.spawn(function()
                             
                             if hum and hum.Health > 0 and root and not Players:GetPlayerFromCharacter(m) then
                                 local isTarget = false
-                                
-                                -- Condition Check (All / Raid / Specific)
                                 if Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
                                     isTarget = true 
                                 elseif Options.AutoFarm.Value and Options.MonsterSelect.Value[m.Name] then
@@ -314,10 +333,8 @@ task.spawn(function()
                     end
 
                     if target and target:FindFirstChild("HumanoidRootPart") then
-                        -- วาร์ปตามระยะที่ตั้งใน Slider
                         TeleportTo(target.HumanoidRootPart.CFrame * CFrame.new(0, 0, Options.FarmDistance.Value))
                         
-                        -- โจมตีอัตโนมัติ
                         if Options.AutoAtk.Value then
                             local weaponName = Options.WeaponSelect.Value
                             if weaponName then
@@ -335,7 +352,7 @@ task.spawn(function()
     end
 end)
 
--- Settings Loop (Speed / AFK / Jump / Reset)
+-- Utility Loops
 RunService.RenderStepped:Connect(function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and Options.WalkSpeed.Value > 16 then
         LocalPlayer.Character.Humanoid.WalkSpeed = Options.WalkSpeed.Value
@@ -368,4 +385,4 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
-Fluent:Notify({Title = "KUYRAISUS", Content = "UI Loaded! ฟังก์ชันครบถ้วนและแก้ไขบัคแล้วครับ", Duration = 5})
+Fluent:Notify({Title = "KUYRAISUS", Content = "UI Successfully Loaded!", Duration = 5})
