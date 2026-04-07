@@ -1,0 +1,365 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "KUYRAISUS PREMIUM",
+    SubTitle = "Dudung Universe Edition",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false, 
+    Theme = "Dark"
+})
+
+local Tabs = { 
+    Main = Window:AddTab({ Title = "Combat", Icon = "rbxassetid://4483345998" }),
+    Raid = Window:AddTab({ Title = "Raid Mode", Icon = "rbxassetid://10747379650" }),
+    Boss = Window:AddTab({ Title = "Boss Farm", Icon = "rbxassetid://10747379650" }),
+    TP = Window:AddTab({ Title = "Teleport", Icon = "rbxassetid://10747379650" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "rbxassetid://7072721666" })
+}
+
+local Options = Fluent.Options
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+
+-------------------------------------------------------------------------------
+-- [ GUI CONTROLS ]
+-------------------------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("TextButton")
+local Corner = Instance.new("UICorner")
+
+ScreenGui.Name = "KuyraisusToggle"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = ScreenGui
+ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ToggleButton.Position = UDim2.new(0, 20, 0, 20)
+ToggleButton.Size = UDim2.new(0, 45, 0, 45)
+ToggleButton.Text = "UI"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 18
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Active = true
+ToggleButton.Draggable = true 
+
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = ToggleButton
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Window:Minimize()
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe then
+        if input.KeyCode == Enum.KeyCode.LeftControl then
+            Window:Minimize()
+        elseif input.KeyCode == Enum.KeyCode.K then
+            ScreenGui.Enabled = not ScreenGui.Enabled
+        end
+    end
+end)
+
+-------------------------------------------------------------------------------
+-- [ DATA UTILITIES ]
+-------------------------------------------------------------------------------
+local function GetMonsters()
+    local monsterList = {}
+    local added = {}
+    local aliveFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Alive")
+    if aliveFolder then
+        for _, v in ipairs(aliveFolder:GetChildren()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(v) then
+                if not added[v.Name] then
+                    table.insert(monsterList, v.Name)
+                    added[v.Name] = true
+                end
+            end
+        end
+    end
+    return monsterList
+end
+
+local function GetBackpackItems()
+    local items = {}
+    for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then table.insert(items, item.Name) end
+    end
+    if LocalPlayer.Character then
+        for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
+            if item:IsA("Tool") then table.insert(items, item.Name) end
+        end
+    end
+    return items
+end
+
+local function GetFolderItems(path)
+    local items = {}
+    if path then
+        for _, v in ipairs(path:GetChildren()) do table.insert(items, v.Name) end
+    end
+    return items
+end
+
+-------------------------------------------------------------------------------
+-- [ COMBAT TAB ]
+-------------------------------------------------------------------------------
+Tabs.Main:AddParagraph({Title = "Auto Farm Configuration", Content = "Select targets and weapons for automation."})
+
+local WeaponDropdown = Tabs.Main:AddDropdown("WeaponSelect", {
+    Title = "Select Weapon",
+    Values = GetBackpackItems(),
+    Multi = false, Default = nil,
+})
+
+local MonsterDropdown = Tabs.Main:AddDropdown("MonsterSelect", {
+    Title = "Target Monsters",
+    Values = GetMonsters(),
+    Multi = true, Default = {},
+})
+
+Tabs.Main:AddButton({
+    Title = "Refresh Data",
+    Callback = function()
+        MonsterDropdown:SetValues(GetMonsters())
+        WeaponDropdown:SetValues(GetBackpackItems())
+    end
+})
+
+local FarmDistSlider = Tabs.Main:AddSlider("FarmDistance", {
+    Title = "Farming Distance",
+    Default = 4, Min = 1, Max = 15, Rounding = 1,
+})
+
+Tabs.Main:AddToggle("AutoFarm", {Title = "Auto Farm (Selected Only)", Default = false})
+Tabs.Main:AddToggle("AutoFarmAll", {Title = "Auto Farm (All Monsters)", Default = false})
+Tabs.Main:AddToggle("AutoAtk", {Title = "Auto Attack (M1)", Default = false})
+Tabs.Main:AddToggle("InstaKill89", {Title = "InstaKill (Boss & Raid < 89%)", Default = false})
+Tabs.Main:AddToggle("InstaKill99", {Title = "InstaKill (Monsters < 99%)", Default = false})
+
+-------------------------------------------------------------------------------
+-- [ RAID TAB ]
+-------------------------------------------------------------------------------
+Tabs.Raid:AddParagraph({Title = "Raid Automation", Content = "Configure Raid settings."})
+Tabs.Raid:AddToggle("AutoRaid", {Title = "Auto Start Raid", Default = false})
+Tabs.Raid:AddToggle("AutoFarmRaid", {Title = "Auto Farm Monsters in Raid", Default = false})
+
+-------------------------------------------------------------------------------
+-- [ BOSS TAB ]
+-------------------------------------------------------------------------------
+Tabs.Boss:AddParagraph({Title = "Boss Spawner & Farming", Content = "Manage world boss spawns."})
+
+local BossSelectDropdown = Tabs.Boss:AddDropdown("BossToSpawn", {
+    Title = "Select Bosses to Spawn",
+    Values = {"Night Blade Boss", "Asakusa Boss", "Getsuga Boss", "Hakari Boss", "Limitless Boss", "Shadow Boss", "Vasto Lorde Boss"},
+    Multi = true, 
+    Default = {"Shadow Boss"},
+})
+
+local DiffSelectDropdown = Tabs.Boss:AddDropdown("BossDifficulty", {
+    Title = "Difficulty Level",
+    Values = {"Normal", "Advanced", "Expert"},
+    Default = "Expert",
+})
+
+Tabs.Boss:AddToggle("AutoSpawnBoss", {Title = "Enable Auto Boss Spawner", Default = false})
+Tabs.Boss:AddToggle("AutoHaki", {Title = "Auto Activate Haki (On Spawn)", Default = true})
+
+-------------------------------------------------------------------------------
+-- [ TELEPORT TAB ]
+-------------------------------------------------------------------------------
+local CraftDropdown = Tabs.TP:AddDropdown("CraftSelect", {
+    Title = "Teleport to Crafting",
+    Values = GetFolderItems(workspace.Map:FindFirstChild("CraftAbillities")),
+    Callback = function(Value)
+        local target = workspace.Map.CraftAbillities:FindFirstChild(Value)
+        if target and LocalPlayer.Character then 
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target:IsA("Model") and target:GetModelCFrame() or target.CFrame
+        end
+    end
+})
+Tabs.TP:AddButton({ Title = "Refresh Crafting List", Callback = function() CraftDropdown:SetValues(GetFolderItems(workspace.Map.CraftAbillities)) end })
+
+local NPCDropdown = Tabs.TP:AddDropdown("NPCSelect", {
+    Title = "Teleport to NPCs",
+    Values = GetFolderItems(workspace.Map:FindFirstChild("NPC")),
+    Callback = function(Value)
+        local target = workspace.Map.NPC:FindFirstChild(Value)
+        if target and LocalPlayer.Character then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target:IsA("Model") and target:GetModelCFrame() or target.CFrame
+        end
+    end
+})
+Tabs.TP:AddButton({ Title = "Refresh NPC List", Callback = function() NPCDropdown:SetValues(GetFolderItems(workspace.Map.NPC)) end })
+
+-------------------------------------------------------------------------------
+-- [ SETTINGS TAB ]
+-------------------------------------------------------------------------------
+local SpeedSlider = Tabs.Settings:AddSlider("WalkSpeed", {Title = "Walk Speed", Default = 16, Min = 16, Max = 250, Rounding = 1})
+local InfAFKToggle = Tabs.Settings:AddToggle("InfAFK", {Title = "Infinite AFK (Anti-Kick)", Default = true})
+local InfJumpToggle = Tabs.Settings:AddToggle("InfJump", {Title = "Infinite Jump", Default = false})
+local AutoResetToggle = Tabs.Settings:AddToggle("AutoReset", {Title = "Auto Reset Character (Every 60s)", Default = false})
+
+-------------------------------------------------------------------------------
+-- [ CORE LOOPS & SYSTEMS ]
+-------------------------------------------------------------------------------
+
+local function TeleportTo(cframe)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
+    end
+end
+
+-- Auto Haki System
+local function UseHaki()
+    if not Options.AutoHaki.Value then return end
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    task.wait(2)
+    pcall(function()
+        local argsB = {"Haki", "B", Vector3.new(241.356, 50.813, 1232.838), "Armament Haki", "Haki", char.HumanoidRootPart.CFrame}
+        ReplicatedStorage:WaitForChild("Events"):WaitForChild("AbillityEvent"):FireServer(unpack(argsB))
+        task.wait(0.5)
+        local argsG = {"Haki", "G", Vector3.new(237.362, 41.500, 1227.838), "Observation Haki", "Haki", char.HumanoidRootPart.CFrame}
+        ReplicatedStorage:WaitForChild("Events"):WaitForChild("AbillityEvent"):FireServer(unpack(argsG))
+    end)
+end
+LocalPlayer.CharacterAdded:Connect(UseHaki)
+if LocalPlayer.Character then task.spawn(UseHaki) end
+
+-- Insta-Kill Logic
+task.spawn(function()
+    while task.wait(0.1) do 
+        if Options.InstaKill89.Value or Options.InstaKill99.Value then
+            pcall(function()
+                local aliveFolder = workspace.Map:FindFirstChild("Alive")
+                if aliveFolder then
+                    for _, m in ipairs(aliveFolder:GetChildren()) do
+                        local hum = m:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 and not Players:GetPlayerFromCharacter(m) then
+                            local hpPercent = (hum.Health / hum.MaxHealth) * 100
+                            if (Options.InstaKill99.Value and hpPercent < 99) or (Options.InstaKill89.Value and hpPercent < 89) then
+                                hum.Health = 0
+                                hum:TakeDamage(hum.MaxHealth * 2) 
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Auto Spawn Boss Logic
+task.spawn(function()
+    while task.wait(1) do
+        if Options.AutoSpawnBoss.Value then
+            pcall(function()
+                local aliveFolder = workspace.Map:FindFirstChild("Alive")
+                local selectedBosses = Options.BossToSpawn.Value
+                if aliveFolder then
+                    for bossName, isSelected in pairs(selectedBosses) do
+                        if isSelected and not aliveFolder:FindFirstChild(bossName) then
+                            local args = {"SpawnWithCurrency", bossName, Options.BossDifficulty.Value}
+                            ReplicatedStorage.Events.BossSpawner:FireServer(unpack(args))
+                            task.wait(3)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Unified Auto Farm Logic
+task.spawn(function()
+    while task.wait(0.1) do
+        if Options.AutoFarm.Value or Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and char:FindFirstChild("HumanoidRootPart") then
+                    local target = nil
+                    local dist = math.huge
+                    local aliveFolder = workspace.Map:FindFirstChild("Alive")
+                    
+                    if aliveFolder then
+                        for _, m in ipairs(aliveFolder:GetChildren()) do
+                            local hum = m:FindFirstChild("Humanoid")
+                            local root = m:FindFirstChild("HumanoidRootPart")
+                            if hum and hum.Health > 0 and root and not Players:GetPlayerFromCharacter(m) then
+                                local isTarget = false
+                                if Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
+                                    isTarget = true 
+                                elseif Options.AutoFarm.Value and Options.MonsterSelect.Value[m.Name] then
+                                    isTarget = true 
+                                end
+                                
+                                if isTarget then
+                                    local mag = (char.HumanoidRootPart.Position - root.Position).Magnitude
+                                    if mag < dist then 
+                                        dist = mag
+                                        target = m 
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if target and target:FindFirstChild("HumanoidRootPart") then
+                        TeleportTo(target.HumanoidRootPart.CFrame * CFrame.new(0, 0, Options.FarmDistance.Value))
+                        if Options.AutoAtk.Value then
+                            local weaponName = Options.WeaponSelect.Value
+                            if weaponName then
+                                local weapon = char:FindFirstChild(weaponName) or LocalPlayer.Backpack:FindFirstChild(weaponName)
+                                if weapon then
+                                    if weapon.Parent == LocalPlayer.Backpack then char.Humanoid:EquipTool(weapon) end
+                                    ReplicatedStorage.Events.AbillityEvent:FireServer(weapon:GetAttribute("ItemId") or weapon.Name, "M1", Vector3.zero, "M1 Attack", weapon:GetAttribute("Category") or "Melee")
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Utility Functions (Speed, AFK, Jump, Reset)
+RunService.RenderStepped:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and Options.WalkSpeed.Value > 16 then
+        LocalPlayer.Character.Humanoid.WalkSpeed = Options.WalkSpeed.Value
+    end
+end)
+
+LocalPlayer.Idled:Connect(function()
+    if Options.InfAFK.Value then VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new()) end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(60)
+        if Options.AutoReset.Value then
+            pcall(function()
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    LocalPlayer.Character.Humanoid.Health = 0
+                end
+            end)
+        end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if Options.InfJump.Value then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+        end
+    end
+end)
+
+Fluent:Notify({Title = "KUYRAISUS", Content = "Script Loaded! All features are synchronized and ready.", Duration = 5})
