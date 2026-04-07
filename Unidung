@@ -107,7 +107,7 @@ local function GetFolderItems(path)
 end
 
 -------------------------------------------------------------------------------
--- [ Main Tab ]
+-- [ UI Components Setup ]
 -------------------------------------------------------------------------------
 Tabs.Main:AddParagraph({Title = "Combat Settings", Content = "Configure automatic monster farming."})
 
@@ -142,37 +142,25 @@ Tabs.Main:AddToggle("AutoAtk", {Title = "Auto Attack", Default = false})
 Tabs.Main:AddToggle("InstaKill89", {Title = "InstaKill (Boss & Raid)", Default = false})
 Tabs.Main:AddToggle("InstaKill99", {Title = "InstaKill (99% Threshold)", Default = false})
 
--------------------------------------------------------------------------------
--- [ Raid Tab ]
--------------------------------------------------------------------------------
 Tabs.Raid:AddParagraph({Title = "Raid Automation", Content = "Automate Raid entry and combat."})
 Tabs.Raid:AddToggle("AutoRaid", {Title = "Auto Start Raid", Default = false})
 Tabs.Raid:AddToggle("AutoFarmRaid", {Title = "Auto Farm Raid Monsters", Default = false})
 
--------------------------------------------------------------------------------
--- [ Boss Tab ]
--------------------------------------------------------------------------------
 Tabs.Boss:AddParagraph({Title = "Boss Management", Content = "Automated boss spawner and farming."})
-
 local BossSelectDropdown = Tabs.Boss:AddDropdown("BossToSpawn", {
     Title = "Select Bosses to Spawn",
     Values = {"Night Blade Boss", "Asakusa Boss", "Getsuga Boss", "Hakari Boss", "Limitless Boss", "Shadow Boss", "Vasto Lorde Boss"},
     Multi = true, 
     Default = {"Shadow Boss"},
 })
-
 local DiffSelectDropdown = Tabs.Boss:AddDropdown("BossDifficulty", {
     Title = "Select Difficulty",
     Values = {"Normal", "Advanced", "Expert"},
     Default = "Expert",
 })
-
 Tabs.Boss:AddToggle("AutoSpawnBoss", {Title = "Enable Auto Spawn Boss", Default = false})
 Tabs.Boss:AddToggle("AutoHaki", {Title = "Auto Haki (On Respawn)", Default = true})
 
--------------------------------------------------------------------------------
--- [ Teleport Tab ]
--------------------------------------------------------------------------------
 local CraftDropdown = Tabs.TP:AddDropdown("CraftSelect", {
     Title = "Crafting Stations",
     Values = GetFolderItems(workspace.Map:FindFirstChild("CraftAbillities")),
@@ -197,38 +185,20 @@ local NPCDropdown = Tabs.TP:AddDropdown("NPCSelect", {
 })
 Tabs.TP:AddButton({ Title = "Refresh NPCs", Callback = function() NPCDropdown:SetValues(GetFolderItems(workspace.Map.NPC)) end })
 
--------------------------------------------------------------------------------
--- [ Settings Tab ]
--------------------------------------------------------------------------------
 Tabs.Settings:AddParagraph({Title = "Automation & Shop", Content = "Purchasing and Player tweaks."})
-
 Tabs.Settings:AddToggle("AutoBuyRace", {Title = "Auto Buy Race Reroll", Default = false})
 local BuySpeedSlider = Tabs.Settings:AddSlider("BuySpeed", {
     Title = "Buy Delay (Seconds)",
     Default = 0.5, Min = 0.1, Max = 5, Rounding = 1,
 })
-
 Tabs.Settings:AddSlider("WalkSpeed", {Title = "Walk Speed", Default = 16, Min = 16, Max = 250, Rounding = 1})
 Tabs.Settings:AddToggle("InfAFK", {Title = "Infinite AFK (Anti-Idle)", Default = true})
 Tabs.Settings:AddToggle("InfJump", {Title = "Infinite Jump", Default = false})
 Tabs.Settings:AddToggle("AutoReset", {Title = "Auto Reset (Every 60s)", Default = false})
 
 -------------------------------------------------------------------------------
--- [ Loops & Core Functions ]
+-- [ Core Functions ]
 -------------------------------------------------------------------------------
-
--- Auto Buy Race Loop
-task.spawn(function()
-    while true do
-        if Options.AutoBuyRace.Value then
-            pcall(function()
-                local args = {"Buy", "Race Reroll", "1"}
-                ReplicatedStorage:WaitForChild("Events"):WaitForChild("Trader"):FireServer(unpack(args))
-            end)
-        end
-        task.wait(Options.BuySpeed.Value)
-    end
-end)
 
 local function TeleportTo(cframe)
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -236,21 +206,31 @@ local function TeleportTo(cframe)
     end
 end
 
+-- Auto Buy Race Loop
+task.spawn(function()
+    while true do
+        if Options.AutoBuyRace.Value then
+            pcall(function()
+                ReplicatedStorage:WaitForChild("Events"):WaitForChild("Trader"):FireServer("Buy", "Race Reroll", "1")
+            end)
+        end
+        task.wait(Options.BuySpeed.Value)
+    end
+end)
+
 -- Auto Haki Logic
 local function UseHaki()
     if not Options.AutoHaki.Value then return end
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    task.wait(2)
+    task.wait(2.5) -- รอให้ตัวละครโหลดเสร็จจริงๆ
     pcall(function()
-        local argsB = {"Haki", "B", Vector3.new(241.356, 50.813, 1232.838), "Armament Haki", "Haki", char.HumanoidRootPart.CFrame}
-        ReplicatedStorage:WaitForChild("Events"):WaitForChild("AbillityEvent"):FireServer(unpack(argsB))
+        local root = char:WaitForChild("HumanoidRootPart")
+        ReplicatedStorage.Events.AbillityEvent:FireServer("Haki", "B", Vector3.new(241, 50, 1232), "Armament Haki", "Haki", root.CFrame)
         task.wait(0.5)
-        local argsG = {"Haki", "G", Vector3.new(237.362, 41.500, 1227.838), "Observation Haki", "Haki", char.HumanoidRootPart.CFrame}
-        ReplicatedStorage:WaitForChild("Events"):WaitForChild("AbillityEvent"):FireServer(unpack(argsG))
+        ReplicatedStorage.Events.AbillityEvent:FireServer("Haki", "G", Vector3.new(237, 41, 1227), "Observation Haki", "Haki", root.CFrame)
     end)
 end
 LocalPlayer.CharacterAdded:Connect(UseHaki)
-if LocalPlayer.Character then task.spawn(UseHaki) end
 
 -- Insta-Kill System
 task.spawn(function()
@@ -260,7 +240,7 @@ task.spawn(function()
                 local aliveFolder = workspace.Map:FindFirstChild("Alive")
                 if aliveFolder then
                     for _, m in ipairs(aliveFolder:GetChildren()) do
-                        local hum = m:FindFirstChildOfClass("Humanoid")
+                        local hum = m:FindFirstChild("Humanoid")
                         if hum and hum.Health > 0 and not Players:GetPlayerFromCharacter(m) then
                             local hpPercent = (hum.Health / hum.MaxHealth) * 100
                             if (Options.InstaKill99.Value and hpPercent < 99) or (Options.InstaKill89.Value and hpPercent < 89) then
@@ -277,7 +257,7 @@ end)
 
 -- Auto Spawn Boss Logic
 task.spawn(function()
-    while task.wait(1) do
+    while task.wait(1.5) do
         if Options.AutoSpawnBoss.Value then
             pcall(function()
                 local aliveFolder = workspace.Map:FindFirstChild("Alive")
@@ -285,9 +265,8 @@ task.spawn(function()
                 if aliveFolder then
                     for bossName, isSelected in pairs(selectedBosses) do
                         if isSelected and not aliveFolder:FindFirstChild(bossName) then
-                            local args = {"SpawnWithCurrency", bossName, Options.BossDifficulty.Value}
-                            ReplicatedStorage.Events.BossSpawner:FireServer(unpack(args))
-                            task.wait(3)
+                            ReplicatedStorage.Events.BossSpawner:FireServer("SpawnWithCurrency", bossName, Options.BossDifficulty.Value)
+                            task.wait(2)
                         end
                     end
                 end
@@ -296,53 +275,67 @@ task.spawn(function()
     end
 end)
 
--- Auto Farm Logic
+-------------------------------------------------------------------------------
+-- [ MASTER AUTO FARM LOOP ]
+-------------------------------------------------------------------------------
 task.spawn(function()
     while task.wait(0.1) do
         if Options.AutoFarm.Value or Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
             pcall(function()
                 local char = LocalPlayer.Character
-                if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and char:FindFirstChild("HumanoidRootPart") then
-                    
-                    local target = nil
-                    local dist = math.huge
-                    local aliveFolder = workspace.Map:FindFirstChild("Alive")
-                    
-                    if aliveFolder then
-                        for _, m in ipairs(aliveFolder:GetChildren()) do
-                            local hum = m:FindFirstChild("Humanoid")
-                            local root = m:FindFirstChild("HumanoidRootPart")
+                -- เช็คตัวละครทุกรอบ (ถ้าตายหรือยังไม่เกิดให้ข้าม)
+                if not (char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and char:FindFirstChild("HumanoidRootPart")) then
+                    return 
+                end
+
+                local target = nil
+                local dist = math.huge
+                local aliveFolder = workspace.Map:FindFirstChild("Alive")
+                
+                if aliveFolder then
+                    for _, m in ipairs(aliveFolder:GetChildren()) do
+                        local hum = m:FindFirstChild("Humanoid")
+                        local root = m:FindFirstChild("HumanoidRootPart")
+                        
+                        if hum and hum.Health > 0 and root and not Players:GetPlayerFromCharacter(m) then
+                            local isTarget = false
+                            if Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
+                                isTarget = true 
+                            elseif Options.AutoFarm.Value and Options.MonsterSelect.Value[m.Name] then
+                                isTarget = true 
+                            end
                             
-                            if hum and hum.Health > 0 and root and not Players:GetPlayerFromCharacter(m) then
-                                local isTarget = false
-                                if Options.AutoFarmAll.Value or Options.AutoFarmRaid.Value then
-                                    isTarget = true 
-                                elseif Options.AutoFarm.Value and Options.MonsterSelect.Value[m.Name] then
-                                    isTarget = true 
-                                end
-                                
-                                if isTarget then
-                                    local mag = (char.HumanoidRootPart.Position - root.Position).Magnitude
-                                    if mag < dist then 
-                                        dist = mag
-                                        target = m 
-                                    end
+                            if isTarget then
+                                local mag = (char.HumanoidRootPart.Position - root.Position).Magnitude
+                                if mag < dist then 
+                                    dist = mag
+                                    target = m 
                                 end
                             end
                         end
                     end
+                end
 
-                    if target and target:FindFirstChild("HumanoidRootPart") then
-                        TeleportTo(target.HumanoidRootPart.CFrame * CFrame.new(0, 0, Options.FarmDistance.Value))
-                        
-                        if Options.AutoAtk.Value then
-                            local weaponName = Options.WeaponSelect.Value
-                            if weaponName then
-                                local weapon = char:FindFirstChild(weaponName) or LocalPlayer.Backpack:FindFirstChild(weaponName)
-                                if weapon then
-                                    if weapon.Parent == LocalPlayer.Backpack then char.Humanoid:EquipTool(weapon) end
-                                    ReplicatedStorage.Events.AbillityEvent:FireServer(weapon:GetAttribute("ItemId") or weapon.Name, "M1", Vector3.zero, "M1 Attack", weapon:GetAttribute("Category") or "Melee")
+                if target and target:FindFirstChild("HumanoidRootPart") then
+                    -- วาร์ป
+                    TeleportTo(target.HumanoidRootPart.CFrame * CFrame.new(0, 0, Options.FarmDistance.Value))
+                    
+                    -- โจมตีและถืออาวุธ
+                    if Options.AutoAtk.Value then
+                        local weaponName = Options.WeaponSelect.Value
+                        if weaponName then
+                            local weapon = char:FindFirstChild(weaponName) or LocalPlayer.Backpack:FindFirstChild(weaponName)
+                            if weapon then
+                                if weapon.Parent == LocalPlayer.Backpack then 
+                                    char.Humanoid:EquipTool(weapon) 
                                 end
+                                ReplicatedStorage.Events.AbillityEvent:FireServer(
+                                    weapon:GetAttribute("ItemId") or weapon.Name, 
+                                    "M1", 
+                                    Vector3.zero, 
+                                    "M1 Attack", 
+                                    weapon:GetAttribute("Category") or "Melee"
+                                )
                             end
                         end
                     end
@@ -352,11 +345,17 @@ task.spawn(function()
     end
 end)
 
--- Utility Loops
+-------------------------------------------------------------------------------
+-- [ Utility Loops ]
+-------------------------------------------------------------------------------
 RunService.RenderStepped:Connect(function()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and Options.WalkSpeed.Value > 16 then
-        LocalPlayer.Character.Humanoid.WalkSpeed = Options.WalkSpeed.Value
-    end
+    pcall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            if Options.WalkSpeed.Value > 16 then
+                LocalPlayer.Character.Humanoid.WalkSpeed = Options.WalkSpeed.Value
+            end
+        end
+    end)
 end)
 
 LocalPlayer.Idled:Connect(function()
@@ -385,4 +384,4 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
-Fluent:Notify({Title = "KUYRAISUS", Content = "UI Successfully Loaded!", Duration = 5})
+Fluent:Notify({Title = "KUYRAISUS HUB", Content = "Script Fully Loaded & Fixed!", Duration = 5})
