@@ -1,0 +1,121 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Train Your Fish to Race IFN OP",
+    SubTitle = "BY KUYRAISUS)",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.End 
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local ToggleStates = { InfWin = false, AutoRebirth = false, AutoFarm = false, AntiAFK = false }
+
+-- [[ Functions ]]
+Tabs.Main:AddToggle("InfWin", {Title = "Infinite Win", Default = false}):OnChanged(function(Value)
+    ToggleStates.InfWin = Value
+    if Value then
+        task.spawn(function()
+            game:GetService("ReplicatedStorage").Remotes.Event.GameRun["[C-S]PlayerTryRace"]:FireServer()
+            while ToggleStates.InfWin do
+                game:GetService("ReplicatedStorage").Remotes.Event.GameRun["[C-S]PlayerTryGetRaceReward"]:FireServer("16")
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+Tabs.Main:AddToggle("AutoRebirth", {Title = "Auto Rebirth", Default = false}):OnChanged(function(Value)
+    ToggleStates.AutoRebirth = Value
+    if Value then
+        task.spawn(function()
+            while ToggleStates.AutoRebirth do
+                game:GetService("ReplicatedStorage").Remotes.Event.Eco["[C-S]PlayerTryRebirth"]:FireServer()
+                task.wait(1)
+            end
+        end)
+    end
+end)
+
+Tabs.Main:AddToggle("AutoFarm", {Title = "Auto Farm Power", Default = false}):OnChanged(function(Value)
+    ToggleStates.AutoFarm = Value
+    if Value then
+        task.spawn(function()
+            while ToggleStates.AutoFarm do
+                game:GetService("ReplicatedStorage").Remotes.Event.GameRun["[C-S]PlayerTrySceneTrain"]:FireServer("2")
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+Tabs.Settings:AddToggle("AntiAFK", {Title = "Inf AFK", Default = false}):OnChanged(function(Value)
+    ToggleStates.AntiAFK = Value
+end)
+
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
+    if ToggleStates.AntiAFK then
+        game:GetService("VirtualUser"):CaptureController()
+        game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+    end
+end)
+
+-- [[ ระบบปุ่ม Toggle แบบใหม่ ]]
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleBtn = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "FinalToggleSystem"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+ToggleBtn.Name = "ToggleBtn"
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ToggleBtn.Position = UDim2.new(0.02, 0, 0.3, 0)
+ToggleBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleBtn.Text = "UI"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.Draggable = true 
+
+UICorner.CornerRadius = UDim.new(0, 10) -- แก้ไขตรงนี้จาก Tool.new เป็น UDim.new
+UICorner.Parent = ToggleBtn
+
+local isHidden = false
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    local FluentUI = nil
+    -- ค้นหา UI ของ Fluent โดยเจาะจงที่หน้าจอหลัก
+    for _, v in pairs(game:GetService("CoreGui"):GetChildren()) do
+        if v:IsA("ScreenGui") and v:FindFirstChild("CanvasGroup") then
+            -- Fluent มักใช้ CanvasGroup ในการคุมความโปร่งใสและแสดงผล
+            FluentUI = v
+            break
+        end
+    end
+
+    if FluentUI then
+        isHidden = not isHidden
+        FluentUI.Enabled = not isHidden -- ใช้ .Enabled จะเสถียรกว่าการย้ายตำแหน่ง
+    else
+        -- กรณีหาไม่เจอในครั้งแรก (บาง Executor อาจวางต่างที่)
+        for _, v in pairs(game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
+            if v:IsA("ScreenGui") and v:FindFirstChild("CanvasGroup") then
+                FluentUI = v
+                isHidden = not isHidden
+                FluentUI.Enabled = not isHidden
+                break
+            end
+        end
+    end
+end)
+
+Fluent:Notify({ Title = "Script Ready", Content = "กดปุ่ม UI เพื่อ เปิด/ปิด เมนู", Duration = 5 })
