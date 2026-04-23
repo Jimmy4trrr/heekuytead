@@ -1,0 +1,378 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "OP SCRIPT Clover Origins",
+    SubTitle = "by KUYRAISUS",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Darker" -- 
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Auto Farm", Icon = "swords" }),
+    Quest = Window:AddTab({ Title = "Quests", Icon = "scroll" }),
+    Reroll = Window:AddTab({ Title = "Reroll", Icon = "refresh-cw" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }) -- [cite: 1, 2]
+}
+
+local Options = Fluent.Options
+
+-------------------------------------------------------------------
+-- [ UI TOGGLE BUTTON ] - ปุ่มซ่อน/แสดง UI
+-------------------------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "GuiToggleButton"
+ScreenGui.Parent = game:GetService("CoreGui")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = ScreenGui
+ToggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+ToggleButton.Position = UDim2.new(0.02, 0, 0.2, 0)
+ToggleButton.Size = UDim2.fromOffset(45, 45)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "UI"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 16
+ToggleButton.Draggable = true
+ToggleButton.Active = true
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = ToggleButton
+
+ToggleButton.MouseButton1Click:Connect(function()
+    Window:Minimize()
+end)
+
+-------------------------------------------------------------------
+-- [ DATA / CONFIG ]
+-------------------------------------------------------------------
+local AutoRerollRace = false
+local TargetRaces = {}
+local AutoRerollGrimoire = false
+local TargetGrimoires = {}
+local GrimoireList = {"Earth", "Fire", "Water", "Lightning", "Dark", "AntiMagic", "Wind", "Light", "Time"} -- 
+
+local AutoFarm = false
+local FarmDistance = 7
+local NoclipEnabled = false
+local AutoEquip = false
+local SelectedWeapon = ""
+local AutoAttack = false 
+
+local AutoQuest = false
+local SelectedQuest = "" -- 
+
+-------------------------------------------------------------------
+-- [ FUNCTIONS ]
+-------------------------------------------------------------------
+local function GetQuestList()
+    local quests = {}
+    local folder = workspace:FindFirstChild("Questgivers")
+    if folder then
+        for _, v in pairs(folder:GetChildren()) do
+            table.insert(quests, v.Name) -- [cite: 1, 3]
+        end
+    end
+    if #quests == 0 then table.insert(quests, "No Quests Found") end
+    return quests
+end
+
+local function UpdateMobList()
+    local mobs = {}
+    local check = {}
+    if workspace:FindFirstChild("Npcs") then
+        for _, v in pairs(workspace.Npcs:GetChildren()) do
+            if v:IsA("Model") and not check[v.Name] then
+                check[v.Name] = true
+                table.insert(mobs, v.Name) -- [cite: 1, 4]
+            end
+        end
+    end
+    return mobs
+end
+
+local function GetBackpackTools()
+    local tools = {}
+    local lp = game:GetService("Players").LocalPlayer
+    if lp and lp:FindFirstChild("Backpack") then
+        for _, tool in pairs(lp.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then table.insert(tools, tool.Name) end -- [cite: 1, 5]
+        end
+    end
+    if lp.Character then
+        for _, tool in pairs(lp.Character:GetChildren()) do
+            if tool:IsA("Tool") then table.insert(tools, tool.Name) end
+        end
+    end
+    if #tools == 0 then table.insert(tools, "No Tools Found") end
+    return tools
+end
+
+-- ระบบ Auto Equip อาวุธ
+task.spawn(function()
+    while true do
+        if AutoEquip and SelectedWeapon ~= "" and SelectedWeapon ~= "No Tools Found" then -- [cite: 1, 6]
+            pcall(function()
+                local lp = game:GetService("Players").LocalPlayer
+                if lp.Character and not lp.Character:FindFirstChild(SelectedWeapon) then
+                    local tool = lp.Backpack:FindFirstChild(SelectedWeapon)
+                    if tool then
+                        lp.Character.Humanoid:EquipTool(tool) -- [cite: 1, 7]
+                    end
+                end
+            end)
+        end
+        task.wait(0.5) -- [cite: 1, 8]
+    end
+end)
+
+-- ระบบ Auto Attack (0.5s)
+task.spawn(function()
+    while true do
+        if AutoAttack then
+            pcall(function()
+                if mouse1click then
+                    mouse1click() -- [cite: 1, 9]
+                elseif mouse1press and mouse1release then
+                    mouse1press()
+                    task.wait(0.02)
+                    mouse1release()
+                else
+                    local vu = game:GetService("VirtualUser") -- [cite: 1, 10]
+                    vu:CaptureController()
+                    vu:Button1Down(Vector2.new(1e4, 1e4))
+                    task.wait(0.02) -- [cite: 1, 11]
+                    vu:Button1Up(Vector2.new(1e4, 1e4))
+                end
+            end)
+        end
+        task.wait(0.5) -- 
+    end
+end)
+
+-- Noclip Loop
+task.spawn(function()
+    game:GetService("RunService").Stepped:Connect(function()
+        if NoclipEnabled or AutoFarm then
+            local lp = game:GetService("Players").LocalPlayer -- [cite: 1, 12]
+            if lp.Character then
+                for _, part in pairs(lp.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end -- [cite: 1, 13]
+        end
+    end)
+end)
+
+-------------------------------------------------------------------
+-- [ AUTO FARM SECTION ]
+-------------------------------------------------------------------
+Tabs.Main:AddSection("Farming & Combat")
+
+Tabs.Main:AddToggle("AtkToggle", {Title = "Attack (auto click)", Default = false }):OnChanged(function(Value)
+    AutoAttack = Value
+end)
+
+local MobDropdown = Tabs.Main:AddDropdown("MobSelect", {
+    Title = "Select NPC",
+    Values = UpdateMobList(),
+    Multi = false,
+    Default = nil,
+})
+
+Tabs.Main:AddButton({
+    Title = "Refresh NPC List",
+    Callback = function() MobDropdown:SetValues(UpdateMobList()) end
+})
+
+Tabs.Main:AddSlider("FarmDist", {
+    Title = "Farm Distance",
+    Default = 7, Min = 2, Max = 15, Rounding = 1, -- [cite: 1, 14]
+    Callback = function(Value) FarmDistance = Value end
+})
+
+Tabs.Main:AddSection("Weapon Settings")
+
+local ToolDropdown = Tabs.Main:AddDropdown("WeaponSelect", {
+    Title = "Select Weapon to Equip",
+    Values = GetBackpackTools(),
+    Multi = false,
+    Default = nil,
+})
+
+ToolDropdown:OnChanged(function(Value) SelectedWeapon = Value end)
+
+Tabs.Main:AddButton({
+    Title = "Refresh Weapon List",
+    Callback = function() ToolDropdown:SetValues(GetBackpackTools()) end
+})
+
+Tabs.Main:AddToggle("EquipToggle", {Title = "Auto Equip Weapon", Default = false }):OnChanged(function(Value)
+    AutoEquip = Value
+end)
+
+Tabs.Main:AddToggle("AutoFarmToggle", {Title = "Enable Auto Farm", Default = false }):OnChanged(function(Value)
+    AutoFarm = Value
+    task.spawn(function() -- [cite: 1, 15]
+        while AutoFarm do
+            local lp = game:GetService("Players").LocalPlayer
+            local target = nil
+            if workspace:FindFirstChild("Npcs") then
+                for _, v in pairs(workspace.Npcs:GetChildren()) do
+                    if v.Name == Options.MobSelect.Value and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then -- [cite: 1, 16]
+                        target = v;
+                        break -- [cite: 1, 17]
+                    end
+                end
+            end
+            if target and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                local offset = CFrame.new(0, -FarmDistance, 0) * CFrame.Angles(math.rad(90), 0, 0)
+                lp.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * offset -- [cite: 1, 18]
+            end
+            task.wait()
+        end
+    end)
+end)
+
+-------------------------------------------------------------------
+-- [ AUTO QUEST SECTION ]
+-------------------------------------------------------------------
+Tabs.Quest:AddSection("Quest System")
+
+local QuestDropdown = Tabs.Quest:AddDropdown("QuestSelect", {
+    Title = "Select Quest",
+    Values = GetQuestList(),
+    Multi = false,
+    Default = nil,
+})
+
+QuestDropdown:OnChanged(function(Value) SelectedQuest = Value end)
+
+Tabs.Quest:AddButton({
+    Title = "Refresh Quest List",
+    Callback = function() QuestDropdown:SetValues(GetQuestList()) end -- [cite: 1, 19]
+})
+
+Tabs.Quest:AddToggle("AutoQuestToggle", {Title = "Enable Auto Quest", Default = false}):OnChanged(function(Value)
+    AutoQuest = Value
+    task.spawn(function()
+        while AutoQuest do
+            if SelectedQuest ~= "" and SelectedQuest ~= "No Quests Found" then
+                local args = {"giveQuest", SelectedQuest}
+                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Quests"):FireServer(unpack(args))
+            end -- [cite: 1, 20]
+            task.wait(0.2)
+        end
+    end)
+end)
+
+-------------------------------------------------------------------
+-- [ REROLL SECTION ]
+-------------------------------------------------------------------
+Tabs.Reroll:AddSection("Race Reroll")
+Tabs.Reroll:AddDropdown("RaceSelect", {
+    Title = "Select Races(Choose more than 1)",
+    Values = {"Angel / Devil", "Angel", "Devil", "Human", "Dark Elf", "Elf", "Dwarf"},
+    Multi = true, Default = {},
+})
+Options.RaceSelect:OnChanged(function(Value) TargetRaces = Value end)
+
+Tabs.Reroll:AddToggle("AutoRerollRace", {Title = "Auto Reroll Race", Default = false }):OnChanged(function(Value)
+    AutoRerollRace = Value
+    task.spawn(function()
+        while AutoRerollRace do
+            local current = (game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Loading") and game:GetService("Players").LocalPlayer.PlayerGui.Loading.InterfacePlay.Area.Races.Container.CurrentRace.Text) or "" -- [cite: 1, 21]
+            local found = false
+            for raceName, selected in pairs(TargetRaces) do
+                if selected and string.find(current, raceName) then found = true; break end -- [cite: 1, 22]
+            end
+            if not found then
+                game:GetService("ReplicatedStorage").Events.Spins:FireServer("Race")
+                task.wait(0.1)
+                game:GetService("ReplicatedStorage").Events.Spins:FireServer("Race", true)
+            else
+                Fluent:Notify({Title = "Success", Content = "Got Race: " .. current, Duration = 5}) -- [cite: 1, 23]
+                Options.AutoRerollRace:SetValue(false)
+            end
+            task.wait(1.5)
+        end
+    end)
+end)
+
+Tabs.Reroll:AddSection("Grimoire Reroll")
+Tabs.Reroll:AddDropdown("GrimoireSelect", {
+    Title = "Select Grimoires(Choose more than 1)",
+    Values = GrimoireList,
+    Multi = true, Default = {},
+})
+Options.GrimoireSelect:OnChanged(function(Value) TargetGrimoires = Value end) -- [cite: 1, 24]
+
+Tabs.Reroll:AddToggle("AutoGrimoire", {Title = "Auto Reroll Grimoire", Default = false }):OnChanged(function(Value)
+    AutoRerollGrimoire = Value
+    task.spawn(function()
+        while AutoRerollGrimoire do
+            local gui = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("GrimoireSpins")
+            local current = (gui and gui.Frame.Frame.LabelGrimoire.Text) or ""
+            local found = false
+            for gName, selected in pairs(TargetGrimoires) do
+                if selected and string.find(current, gName) then found = true; break end -- [cite: 1, 25, 26]
+            end
+            if not found then
+                game:GetService("ReplicatedStorage").Events.Spins:FireServer("Grimoire")
+                task.wait(0.1)
+                game:GetService("ReplicatedStorage").Events.Spins:FireServer("Grimoire", true)
+            else
+                Fluent:Notify({Title = "Success", Content = "Got Grimoire: " .. current, Duration = 5}) -- [cite: 1, 27]
+                Options.AutoGrimoire:SetValue(false)
+            end
+            task.wait(1.5)
+        end
+    end)
+end)
+
+-------------------------------------------------------------------
+-- [ SETTINGS SECTION ]
+-------------------------------------------------------------------
+Tabs.Settings:AddSection("Movement & AFK")
+Tabs.Settings:AddToggle("NoclipToggle", {Title = "Noclip", Default = false }):OnChanged(function(Value) NoclipEnabled = Value end)
+Tabs.Settings:AddToggle("InfAFK", {Title = "Infinite AFK", Default = false }):OnChanged(function(Value)
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        if Options.InfAFK.Value then -- [cite: 1, 28]
+            game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        end
+    end)
+end)
+Tabs.Settings:AddToggle("InfJump", {Title = "Infinite Jump", Default = false })
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if Options.InfJump and Options.InfJump.Value then
+        local lp = game:GetService("Players").LocalPlayer
+        if lp.Character and lp.Character:FindFirstChildOfClass("Humanoid") then
+            lp.Character.Humanoid:ChangeState("Jumping") -- [cite: 1, 29]
+        end
+    end
+end)
+
+Tabs.Settings:AddSection("Character Speed")
+local SpeedValue = 16
+local SpeedEnabled = false
+Tabs.Settings:AddToggle("EnableSpeed", {Title = "Enable Speed Hack", Default = false }):OnChanged(function(Value) SpeedEnabled = Value end)
+Tabs.Settings:AddSlider("SpeedSlider", {
+    Title = "Custom WalkSpeed",
+    Default = 16, Min = 16, Max = 250, Rounding = 1,
+    Callback = function(Value) SpeedValue = Value end
+})
+
+task.spawn(function()
+    while true do
+        if SpeedEnabled then
+            pcall(function() game:GetService("Players").LocalPlayer.Character.Humanoid.WalkSpeed = SpeedValue end) -- [cite: 1, 30]
+        end
+        task.wait(0.1)
+    end
+end)
+
+Window:SelectTab(1)
