@@ -1,0 +1,57 @@
+local codes = {
+    -- New Codes
+    "BRRJO", "2KCORJO", "RJODานB", "2KCO", "RJO", 
+    
+    -- Existing Codes
+    "DANB", "HOLYCODES", "BRMB", "BUFXSO", "200RRS", "KHALID", "MERCIA", 
+    "150RRS", "REVIVE67", "67REROLLS", "BERSERKSOON", "6KREROLLS", "GUEX", 
+    "APIBACKUP", "WUTDWBRANDON", "BRANDONHAHAGONE", "NoShenronBugTODAY", 
+    "NextUpdate2030", "RecklessGambler", "GojoXSukunaUnit", "SixEyes", 
+    "KingOfCurses", "OopsAprilFools", "DomainExpansion", "SCRU", "EXTENSION", 
+    "TRAILERSOONJJK", "DUNNOCODENAMEBUTHERE", "HICRUSADERSWHOOPS", 
+    "SORRYFORSHUTDOWNMOREFIXES", "LAZYMYHAZ", "BUNDLEUSAGEFIX", "SKINCODETODAY", 
+    "HAPPYAPRILFOOLS", "SorryForShutdown67", "BasedCrusaders", "SorryForShutdown2", 
+    "SorryForShutdown", "ACTUALLYFIXEDTHISTIMEAAAA", "ALLTIMEVSTODAY", 
+    "REPLAYCRUSADERS", "BUGCRUSADERSFIXCOMING", "HUNTERMAYHEM", "TRADINGISHERE", 
+    "JUCIESTUPDATECODES", "HUNTERCODEBRIBE", "ENCHANCEYOURNEN", "HICRUSADERS", 
+    "CRUSADERSBIGTIMESCOMING", "BETTERTIMESCOMINGTRUST", "STILLSTANDING", 
+    "TRADINGSOONCOMINGSOON", "WOAHWREACTIONS", "HXHHEREWECOME", "YIPPYCODE", 
+    "HXHSOON", "OHWOWCRUSADERSACTIVE", "LETSGOCRUSADERS1", "CRUSADERSREACTION1", 
+    "InfloadNeverHappenedTrust", "Rhinocerosbeetle", "SORRY4SHUTDOWN", 
+    "THANKYOUFOR10K", "MAINTEANCECRUSADERS", "JOJOUPDATE", "STONEFREE", 
+    "WEATHERREPORT", "STARPLATINUM", "MADEINHEAVEN", "SUPERSORRY4DELAYS", 
+    "HAPPYRAMADAN", "JOJOSCOMINGREALLYSOON", "LETSGOCRUSADERS", 
+    "CRUSADERSHIT100MVISITS", "THANKYOUFOR100MVISITS", "UNICORNMANCOMING", 
+    "BETTERTIMESCOMING", "SHENRONCODE2", "SHENRONCODE1", "SHENRONLOCKINBRUH", 
+    "CRUCIFIED", "JOJOSCOMINGSOONUPD", "NEWDBZUPDATE", "THANKYOUTORIYAMA", 
+    "THANKS4THESUPPORT", "DBZISHERE", "DAILYCHALLENGEFIXED", "DBZFRIDAY", 
+    "DBZSOON", "CRUSADERRUSH", "325KLIKESCODEEARLY", "THANKSFOR1MGROUPMEMBERS", 
+    "THANKSFOR100KFAVORITES", "12KREACTIONSCODE", "BLEACHPART2", "FALSEKARAKURA", 
+    "ACCORDINGTOPLAN", "AIZEN", "FLOWERS", "SIXTHDIVISION", "BOSSRUSHBIWEEKLYRESTOCK", 
+    "WEEKENDEVENTEARLY", "BLEACHPP2SOON", "SELLBUGSORRYFIXEDNOW", 
+    "CRUSADERS10KREACTIONSTHANKYOU", "SOULSOCIETY", "HEDOAFUNNY", 
+    "INFERNOCOMMANDER", "TWINGUNSLINGER", "RISINGCHAINBLADE", "TPNE", 
+    "BLEACHCOMINGFIXED", "BLEACHCOMING", "BOSSRUSHHEADSTART", "SUPERHOLIDAYCODE", 
+    "HAPPYNEWYEARS", "FREERRS", "SUNGODVSDRAGON", "UPDATEISHERE", 
+    "300KLIKESWOWTHANKU", "CHP2NYCOMINGSOON", "THANKYOUFORYOURSUPPORT2025", 
+    "MerryChristmas2025", "Christmas2025Code", "FinalHalloweenRestock", 
+    "FreeBundle", "Thanksfor10kMeansALot", "ChristmasPart1Upd", "UpdateDelay", 
+    "PortalsUpdate", "GingerBread", "NewCrusaderUnit"
+}
+
+local remote = game:GetService("ReplicatedStorage"):WaitForChild("endpoints"):WaitForChild("client_to_server"):WaitForChild("redeem_code")
+
+for _, code in pairs(codes) do
+    print("Attempting to redeem: " .. code)
+    local success, result = pcall(function()
+        return remote:InvokeServer(code)
+    end)
+    
+    if not success then
+        warn("Failed to redeem " .. code .. ": " .. tostring(result))
+    end
+    
+    task.wait(1.5) -- หน่วงเวลาป้องกันการโดนเตะ หรือระบบขัดข้อง
+end
+
+print("All codes have been processed!")
