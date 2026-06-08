@@ -1,0 +1,473 @@
+--[[
+    WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+    Fixed: UI Elements Visibility with Solid Dark Theme & Mini Toggle Button
+    Added: Anti-AFK System + Fly to Floor 50 & Wait for Wall Part 4 to spawn
+]]
+
+local FOLDER_NAME = "LimitedDanielCakeVisuals"
+local REACH_DIST   = 3
+local OFFSET       = Vector3.new(0, 2.5, 0)
+
+local flySpeed  = 300
+local dashSpeed = 300
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace  = game:GetService("Workspace")
+
+local player    = Players.LocalPlayer
+local character, humanoid, rootPart
+
+local cakeFolder = Workspace:FindFirstChild(FOLDER_NAME)
+
+local bv, bg
+local enabled       = false
+local queue         = {}
+local collecting    = false
+local heartbeatConn
+local folderConn
+local spawnPosition = nil
+
+-- สำหรับฟังก์ชันลอยไป Floor 50 -> รอพาร์ทชิ้นที่ 4
+local floor50Enabled = false
+local floor50Conn
+
+------------------------------------------------------------------------
+-- 🌌 ระบบ Anti-AFK (Infinite AFK)
+------------------------------------------------------------------------
+task.spawn(function()
+    local VirtualUser = game:GetService("VirtualUser")
+    player.Idled:Connect(function()
+        VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+    end)
+end)
+
+------------------------------------------------------------------------
+-- Fluent UI Setup
+------------------------------------------------------------------------
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "KUYRAISUS X Re:Aura",
+    SubTitle = "by KUYRAISUS",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local ToggleGui = Instance.new("ScreenGui")
+ToggleGui.Name = "FluentToggleBtnGui"
+ToggleGui.ResetOnSpawn = false
+ToggleGui.IgnoreGuiInset = true
+ToggleGui.Parent = player.PlayerGui
+
+local MiniToggleBtn = Instance.new("TextButton")
+MiniToggleBtn.Size = UDim2.new(0, 40, 0, 40)
+MiniToggleBtn.Position = UDim2.new(0, 20, 0, 100)
+MiniToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MiniToggleBtn.BorderColor3 = Color3.fromRGB(45, 45, 55)
+MiniToggleBtn.BorderSizePixel = 1
+MiniToggleBtn.Text = "K"
+MiniToggleBtn.TextColor3 = Color3.fromRGB(240, 240, 245)
+MiniToggleBtn.Font = Enum.Font.GothamBold
+MiniToggleBtn.TextSize = 16
+MiniToggleBtn.Active = true
+MiniToggleBtn.Draggable = true
+MiniToggleBtn.Parent = ToggleGui
+
+MiniToggleBtn.MouseButton1Click:Connect(function()
+    if Window then Window:Minimize() end
+end)
+
+------------------------------------------------------------------------
+-- Core Logic Functions
+------------------------------------------------------------------------
+local function getCentre(obj)
+    if not obj then return nil end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local cf = obj:GetBoundingBox()
+        return cf.Position
+    elseif obj:IsA("BasePart") then
+        return obj.Position
+    end
+    return nil
+end
+
+local function getClosest()
+    if not rootPart then return nil end
+    local best, bestDist = nil, math.huge
+    for i, obj in ipairs(queue) do
+        if obj and obj.Parent then
+            local c = getCentre(obj)
+            if c then
+                local d = (c - rootPart.Position).Magnitude
+                if d < bestDist then bestDist = d best = i end
+            end
+        end
+    end
+    if best then
+        local obj = queue[best]
+        table.remove(queue, best)
+        return obj
+    end
+end
+
+local function setVelocity(vec)
+    if bv and bv.Parent then bv.Velocity = vec end
+    if bg and bg.Parent and vec.Magnitude > 0 and rootPart then
+        bg.CFrame = CFrame.new(rootPart.Position, rootPart.Position + vec.Unit)
+    end
+end
+
+local noclipConn
+local function startNoclip()
+    noclipConn = RunService.Stepped:Connect(function()
+        if not character then return end
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+local function stopNoclip()
+    if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+    if character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local function startFlight()
+    if not rootPart or not humanoid then return end
+    startNoclip()
+    humanoid.PlatformStand = true
+    bv = Instance.new("BodyVelocity")
+    bv.Name     = "CakeBV"
+    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.Velocity = Vector3.new(0, flySpeed, 0)
+    bv.Parent   = rootPart
+    bg = Instance.new("BodyGyro")
+    bg.Name      = "CakeBG"
+    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bg.CFrame    = rootPart.CFrame
+    bg.Parent    = rootPart
+end
+
+local function stopFlight()
+    stopNoclip()
+    if humanoid then humanoid.PlatformStand = false end
+    if bv and bv.Parent then bv:Destroy() end
+    if bg and bg.Parent then bg:Destroy() end
+end
+
+local function teleportToSpawn()
+    if not spawnPosition or not character then return end
+    local rp = character:FindFirstChild("HumanoidRootPart")
+    if rp then rp.CFrame = CFrame.new(spawnPosition) end
+end
+
+local function updateCharacterReferences(char)
+    if not char then return end
+    character = char
+    humanoid  = char:WaitForChild("Humanoid", 5)
+    rootPart  = char:WaitForChild("HumanoidRootPart", 5)
+end
+
+task.spawn(function()
+    updateCharacterReferences(player.Character or player.CharacterAdded:Wait())
+end)
+
+player.CharacterAdded:Connect(function(char)
+    updateCharacterReferences(char)
+    if spawnPosition then
+        task.wait(0.1)
+        teleportToSpawn()
+    end
+    if enabled or floor50Enabled then
+        task.wait(0.2)
+        stopFlight()
+        startFlight()
+    end
+end)
+
+local function enableCollector(toggleWidget)
+    if enabled then return end
+
+    cakeFolder = Workspace:FindFirstChild(FOLDER_NAME)
+    if not cakeFolder then
+        Fluent:Notify({
+            Title = "System Error",
+            Content = "ไม่พบโฟลเดอร์ '" .. FOLDER_NAME .. "' ในแมปนี้!",
+            Duration = 5
+        })
+        if toggleWidget then toggleWidget:SetValue(false) end
+        return
+    end
+
+    if not rootPart then
+        updateCharacterReferences(player.Character)
+        if not rootPart then 
+            if toggleWidget then toggleWidget:SetValue(false) end
+            return 
+        end
+    end
+
+    enabled    = true
+    queue      = {}
+    collecting = false
+
+    startFlight()
+
+    for _, child in ipairs(cakeFolder:GetChildren()) do
+        if child:IsA("Model") or child:IsA("BasePart") then
+            table.insert(queue, child)
+        end
+    end
+
+    folderConn = cakeFolder.ChildAdded:Connect(function(child)
+        if enabled and (child:IsA("Model") or child:IsA("BasePart")) then
+            table.insert(queue, child)
+        end
+    end)
+
+    heartbeatConn = RunService.Heartbeat:Connect(function()
+        if not enabled or not rootPart or not rootPart.Parent then return end
+
+        if #queue > 0 and not collecting then
+            collecting   = true
+            local target = getClosest()
+            if not target then collecting = false return end
+
+            task.spawn(function()
+                local SLOW_DIST = 20
+                local MIN_SPEED = 20
+
+                while enabled and target and target.Parent and rootPart do
+                    local centre = getCentre(target)
+                    if not centre then break end
+
+                    local dest  = centre + OFFSET
+                    local delta = dest - rootPart.Position
+                    local dist  = delta.Magnitude
+
+                    if dist <= 1 then
+                        rootPart.CFrame = CFrame.new(dest)
+                        break
+                    end
+
+                    local speed
+                    if dist <= SLOW_DIST then
+                        speed = math.max(MIN_SPEED, dashSpeed * (dist / SLOW_DIST))
+                    else
+                        speed = dashSpeed
+                    end
+
+                    local dt       = RunService.Heartbeat:Wait()
+                    local stepSize = speed * dt
+
+                    if stepSize >= dist then
+                        rootPart.CFrame = CFrame.new(dest)
+                        break
+                    end
+
+                    setVelocity(delta.Unit * speed)
+                end
+
+                if enabled and rootPart then
+                    local centre = getCentre(target)
+                    if centre then rootPart.CFrame = CFrame.new(centre + OFFSET) end
+                    setVelocity(Vector3.new(0, 0, 0))
+                    task.wait(1)
+                    setVelocity(Vector3.new(0, flySpeed, 0))
+                end
+
+                collecting = false
+            end)
+        elseif #queue == 0 and not collecting then
+            setVelocity(Vector3.new(0, flySpeed, 0))
+        end
+    end)
+end
+
+local function disableCollector()
+    if not enabled then return end
+    enabled = false
+    if heartbeatConn then heartbeatConn:Disconnect() end
+    if folderConn    then folderConn:Disconnect()    end
+    queue      = {}
+    collecting = false
+    stopFlight()
+end
+
+------------------------------------------------------------------------
+-- 🚀 ฟังก์ชันแบบผันแปร: บินไป Floor 50 ก่อน -> เมื่อถึงแล้วรอให้ Part ชิ้นที่ 4 เกิด
+------------------------------------------------------------------------
+local function enableFloor50Fly(toggleWidget)
+    if floor50Enabled then return end
+    
+    -- ดึงเป้าหมายหลักคือ Floor50 ขึ้นมาก่อน (ใช้ WaitForChild เผื่อโหลดไม่ทัน)
+    local spiralTower = Workspace:FindFirstChild("SpiralTower")
+    local floor50 = spiralTower and spiralTower:WaitForChild("Floor50", 10)
+
+    if not floor50 then
+        Fluent:Notify({
+            Title = "System Error",
+            Content = "ไม่พบจุดตั้งหลัก workspace.SpiralTower.Floor50 !",
+            Duration = 5
+        })
+        if toggleWidget then toggleWidget:SetValue(false) end
+        return
+    end
+
+    if not rootPart then
+        updateCharacterReferences(player.Character)
+        if not rootPart then 
+            if toggleWidget then toggleWidget:SetValue(false) end
+            return 
+        end
+    end
+
+    floor50Enabled = true
+    startFlight()
+
+    floor50Conn = RunService.Heartbeat:Connect(function()
+        if not floor50Enabled or not rootPart or not rootPart.Parent then return end
+        
+        -- ตรวจสอบหาพาร์ทชิ้นที่ 4 ภายใน Walls ของ Floor50 แบบ Real-time
+        local wallsFolder = floor50:FindFirstChild("Walls")
+        local targetPart = nil
+        if wallsFolder then
+            local children = wallsFolder:GetChildren()
+            targetPart = children[4]
+        end
+
+        local finalTarget = targetPart or floor50 -- ถ้ามีชิ้นที่ 4 ให้พุ่งหาชิ้นที่ 4 ถ้ายังไม่มีให้บินไปรอที่ Floor50 ก่อน
+        local targetPos = getCentre(finalTarget)
+        
+        if not targetPos then return end
+        
+        local dest = targetPos + OFFSET
+        local delta = dest - rootPart.Position
+        local dist = delta.Magnitude
+        
+        -- ตรรกะการเคลื่อนที่เข้าหาจุดหมาย
+        if dist <= 2 then
+            rootPart.CFrame = CFrame.new(dest)
+            setVelocity(Vector3.new(0, 0, 0))
+        else
+            local speed = dashSpeed
+            setVelocity(delta.Unit * speed)
+        end
+    end)
+end
+
+local function disableFloor50Fly()
+    if not floor50Enabled then return end
+    floor50Enabled = false
+    if floor50Conn then floor50Conn:Disconnect() floor50Conn = nil end
+    stopFlight()
+end
+
+player.CharacterRemoving:Connect(function()
+    if enabled or floor50Enabled then stopFlight() end
+end)
+
+------------------------------------------------------------------------
+-- UI Elements Connection
+------------------------------------------------------------------------
+
+local AutoFarmToggle = Tabs.Main:AddToggle("AutoFarmToggle", {
+    Title = "Auto Farm Cake", 
+    Default = false
+})
+
+AutoFarmToggle:OnChanged(function(Value)
+    if Value then
+        if floor50Enabled then _G.Floor50ToggleWidget:SetValue(false) end
+        enableCollector(AutoFarmToggle)
+    else
+        disableCollector()
+    end
+end)
+
+local Floor50Toggle = Tabs.Main:AddToggle("Floor50Toggle", {
+    Title = "Fly to Floor 50 (Smart Target)",
+    Description = "KUY KUY KUY KUY KUY KUY",
+    Default = false
+})
+_G.Floor50ToggleWidget = Floor50Toggle
+
+Floor50Toggle:OnChanged(function(Value)
+    if Value then
+        if enabled then AutoFarmToggle:SetValue(false) end
+        enableFloor50Fly(Floor50Toggle)
+    else
+        disableFloor50Fly()
+    end
+end)
+
+Tabs.Main:AddButton({
+    Title = "Set Spawn Position",
+    Description = "มึงจะเล่นโปรทำไมกูงง",
+    Callback = function()
+        if not rootPart then updateCharacterReferences(player.Character) end
+        if rootPart then
+            spawnPosition = rootPart.Position
+            Fluent:Notify({
+                Title = "System",
+                Content = "ทำดีมีรางวัล",
+                Duration = 3
+            })
+        end
+    end
+})
+
+Tabs.Settings:AddSlider("FlySpeedSlider", {
+    Title = "Fly Speed",
+    Description = "บินไปหาพ่อมึงหรอ",
+    Default = 300,
+    Min = 10,
+    Max = 400,
+    Rounding = 0,
+    Callback = function(Value)
+        flySpeed = Value
+        if bv and bv.Parent and not collecting and not floor50Enabled then
+            bv.Velocity = Vector3.new(0, flySpeed, 0)
+        end
+    end
+})
+
+Tabs.Settings:AddSlider("DashSpeedSlider", {
+    Title = "Dash Speed",
+    Description = "อย่าบินเร็วมันจะบัค",
+    Default = 300,
+    Min = 20,
+    Max = 400,
+    Rounding = 0,
+    Callback = function(Value)
+        dashSpeed = Value
+    end
+})
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "KUYRAISUS Hub",
+    Content = "สคริปต์โหลดพร้อมทำงานแบบ Smart-Wait แล้ว!",
+    Duration = 5
+})
