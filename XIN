@@ -1,0 +1,192 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local growFolder = ReplicatedStorage:WaitForChild("Grow_vegetables")
+local plantTreeEvent = growFolder:WaitForChild("PlantTreeEvent")
+local giveWaterEvent = growFolder:WaitForChild("GiveWater")
+local giveFertilizerEvent = growFolder:WaitForChild("GiveFertilizer")
+
+local CENTER_CFRAME = CFrame.new(773.816345, 24.2505112, 826.843201, 0.434957385, 4.67834127e-08, -0.900451064, 7.2447004e-09, 1, 5.54550397e-08, 0.900451064, -3.06440775e-08, 0.434957385)
+local CENTER_POS = CENTER_CFRAME.Position
+
+local autoFarm = false
+local maxTrees = 5
+local maxRadius = 20
+
+local targetTreeNames = {
+    ["CandyTree"] = true,
+    ["DonutsTree"] = true,
+    ["TaffyTree"] = true
+}
+
+local function getNil(name, class)
+    for _, v in next, getnilinstances() do
+        if v.ClassName == class and v.Name == name then
+            return v
+        end
+    end
+    return nil
+end
+
+local function isErrorUI()
+    return getNil("Error", "ImageLabel") ~= nil
+end
+
+local function getTargetTrees()
+    local myTrees = {}
+    local plantedFolder = Workspace:FindFirstChild("AllPlantedTrees")
+    
+    if plantedFolder then
+        for _, obj in pairs(plantedFolder:GetChildren()) do
+            if targetTreeNames[obj.Name] then
+                local treePos = nil
+                local treeCFrame = nil
+                
+                if obj:IsA("Model") and obj.PrimaryPart then
+                    treeCFrame = obj.PrimaryPart.CFrame
+                    treePos = obj.PrimaryPart.Position
+                elseif obj:IsA("BasePart") then
+                    treeCFrame = obj.CFrame
+                    treePos = obj.Position
+                elseif obj:IsA("Model") then
+                    local part = obj:FindFirstChildWhichIsA("BasePart", true)
+                    if part then
+                        treeCFrame = part.CFrame
+                        treePos = part.Position
+                    end
+                end
+                
+                if treePos and (treePos - CENTER_POS).Magnitude <= maxRadius then
+                    table.insert(myTrees, {Instance = obj, CFrame = treeCFrame, Position = treePos})
+                end
+            end
+        end
+    end
+    
+    return myTrees
+end
+
+local function walkTo(targetPosition)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    
+    if humanoid and hrp then
+        if (targetPosition - CENTER_POS).Magnitude > maxRadius then
+            targetPosition = CENTER_POS
+        end
+
+        humanoid:MoveTo(targetPosition)
+        
+        local timeElapsed = 0
+        while (hrp.Position - targetPosition).Magnitude > 3 and timeElapsed < 6 and autoFarm do
+            task.wait(0.2)
+            timeElapsed = timeElapsed + 0.2
+        end
+        return true
+    end
+    return false
+end
+
+local function getPlantPositionInRadius()
+    local offsetX = math.random(-12, 12)
+    local offsetZ = math.random(-12, 12)
+    local randomPos = CENTER_POS + Vector3.new(offsetX, 0, offsetZ)
+    
+    if (randomPos - CENTER_POS).Magnitude > maxRadius then
+        return CENTER_POS
+    end
+    return randomPos
+end
+
+local Window = Rayfield:CreateWindow({
+   Name = "NEVER TOWN OFFICIAL",
+   LoadingTitle = "Loading Script",
+   LoadingSubtitle = "BY KUYRAISUS",
+   ConfigurationSaving = { Enabled = false }
+})
+
+local FarmTab = Window:CreateTab("Auto Farm", 4483362458)
+
+FarmTab:CreateToggle({
+   Name = "Auto Farm Candy",
+   CurrentValue = false,
+   Callback = function(Value)
+      autoFarm = Value
+      if autoFarm then
+         task.spawn(function()
+            while autoFarm do
+               local currentTrees = getTargetTrees()
+               local hasError = isErrorUI()
+               
+               if not hasError and #currentTrees < maxTrees then
+                  local plantPos = getPlantPositionInRadius()
+                  
+                  walkTo(plantPos)
+                  task.wait(0.3)
+                  
+                  local char = LocalPlayer.Character
+                  if char and char:FindFirstChild("HumanoidRootPart") then
+                     local plantCFrame = char.HumanoidRootPart.CFrame
+                     plantTreeEvent:FireServer(plantCFrame)
+                     task.wait(0.8)
+                  end
+               
+               else
+                  currentTrees = getTargetTrees()
+                  
+                  if #currentTrees > 0 then
+                     for _, tree in ipairs(currentTrees) do
+                        if not autoFarm then break end
+                        walkTo(tree.Position)
+                        giveWaterEvent:FireServer(tree.CFrame)
+                        task.wait(0.3)
+                     end
+                     
+                     task.wait(10)
+                     
+                     if autoFarm then
+                        for _, tree in ipairs(currentTrees) do
+                           if not autoFarm then break end
+                           walkTo(tree.Position)
+                           giveWaterEvent:FireServer(tree.CFrame)
+                           task.wait(0.3)
+                        end
+                     end
+                     
+                     task.wait(0.5)
+                     
+                     if autoFarm then
+                        for _, tree in ipairs(currentTrees) do
+                           if not autoFarm then break end
+                           walkTo(tree.Position)
+                           giveFertilizerEvent:FireServer(tree.CFrame)
+                           task.wait(0.3)
+                        end
+                     end
+                  else
+                     walkTo(CENTER_POS)
+                  end
+                  
+                  walkTo(CENTER_POS)
+                  task.wait(5)
+               end
+               
+               task.wait(0.5)
+            end
+         end)
+      end
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Loaded Successfully",
+   Content = "...",
+   Duration = 3,
+})
