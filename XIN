@@ -102,7 +102,8 @@ end
 local function withdrawFruitsLogic()
     for _, fruitName in ipairs(targetFruits) do
         local fruitObject = playerItems:FindFirstChild(fruitName)
-        if fruitObject and fruitObject.Value == 0 then
+        -- แก้ไขเงื่อนไข: ถอนเมื่อของต่ำกว่า 20
+        if fruitObject and fruitObject.Value < 20 then
             withdrawRemote:FireServer(fruitName, 100)
             task.wait(0.5)
         end
@@ -135,8 +136,9 @@ CandyTab:CreateToggle({
     end,
 })
 
+-- แก้ไขชื่อเมนู UI ให้แสดงเป็น "เมื่อต่ำกว่า 20"
 CandyTab:CreateToggle({
-    Name = "ออโต้ถอนผลไม้ออกจากตู้ (เมื่อเหลือ 0)",
+    Name = "ออโต้ถอนผลไม้ออกจากตู้ (เมื่อต่ำกว่า 20)",
     CurrentValue = false,
     Flag = "WithdrawFruitToggle",
     Callback = function(Value)
