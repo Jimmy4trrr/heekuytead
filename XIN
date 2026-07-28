@@ -128,7 +128,7 @@ local function craftAndManageCandyLogic()
 end
 
 CandyTab:CreateToggle({
-    Name = "ออโต้ฝากผลไม้เข้าตู้ (เมื่อครบ 90)",
+    Name = "ออโต้ฝากผลไม้เข้าตู้ (ถ้าครบ 90)",
     CurrentValue = false,
     Flag = "DepositFruitToggle",
     Callback = function(Value)
@@ -138,7 +138,7 @@ CandyTab:CreateToggle({
 
 -- แก้ไขชื่อเมนู UI ให้แสดงเป็น "เมื่อต่ำกว่า 20"
 CandyTab:CreateToggle({
-    Name = "ออโต้ถอนผลไม้ออกจากตู้ (เมื่อต่ำกว่า 20)",
+    Name = "ออโต้ถอนผลไม้ออกจากตู้ (ต่ำกว่า 20)",
     CurrentValue = false,
     Flag = "WithdrawFruitToggle",
     Callback = function(Value)
@@ -147,7 +147,7 @@ CandyTab:CreateToggle({
 })
 
 CandyTab:CreateToggle({
-    Name = "ออโต้คราฟ Candy & ฝากเข้าตู้",
+    Name = "ออโต้คราฟ Candy & ยัดเข้าตู้",
     CurrentValue = false,
     Flag = "CandyToggle",
     Callback = function(Value)
