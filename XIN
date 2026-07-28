@@ -402,7 +402,7 @@ local autoAntiAfk = false
 local afkConnection = nil
 
 SettingsTab:CreateButton({
-    Name = "วาร์ปไปยังจุดตั้งค่า (Teleport)",
+    Name = "Teleport",
     Callback = function()
         local character = LocalPlayer.Character
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -423,7 +423,7 @@ SettingsTab:CreateButton({
 })
 
 SettingsTab:CreateToggle({
-    Name = "เปิดระบบ Inf AFK (กันหลุด 20 นาที)",
+    Name = " Inf AFK",
     CurrentValue = false,
     Flag = "AntiAfkToggle",
     Callback = function(Value)
