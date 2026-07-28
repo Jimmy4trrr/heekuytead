@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -20,8 +21,9 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Tabs Breakdown
-local CandyTab = Window:CreateTab("Auto Candy", 4483362458)
-local MineTab  = Window:CreateTab("Auto Mine", 4483362458)
+local CandyTab    = Window:CreateTab("Auto Candy", 4483362458)
+local MineTab     = Window:CreateTab("Auto Mine", 4483362458)
+local SettingsTab = Window:CreateTab("ตั้งค่า", 4483362458)
 
 -- =================================================================
 -- SYSTEM 1: INSTANT PROXIMITY PROMPT & INPUT HELPER
@@ -59,7 +61,7 @@ local function getItemValue(itemName)
 end
 
 -- =================================================================
--- TAB 1: AUTO CANDY & FRUIT MANAGER (SEPARATED DEPOSIT/WITHDRAW)
+-- TAB 1: AUTO CANDY & FRUIT MANAGER
 -- =================================================================
 local playerItems = LocalPlayer:WaitForChild("Item")
 
@@ -84,7 +86,6 @@ local targetFruits = {
     "Orange"
 }
 
--- ฟังก์ชั่นยัดผลไม้เข้าตู้ (เมื่อมี >= 90)
 local function depositFruitsLogic()
     for _, fruitName in ipairs(targetFruits) do
         local fruitObject = playerItems:FindFirstChild(fruitName)
@@ -95,7 +96,6 @@ local function depositFruitsLogic()
     end
 end
 
--- ฟังก์ชั่นเอาผลไม้ออกจากตู้ (เมื่อเหลือ 0)
 local function withdrawFruitsLogic()
     for _, fruitName in ipairs(targetFruits) do
         local fruitObject = playerItems:FindFirstChild(fruitName)
@@ -106,7 +106,6 @@ local function withdrawFruitsLogic()
     end
 end
 
--- ฟังก์ชั่นคราฟและฝาก Candy
 local function craftAndManageCandyLogic()
     local candyObject = playerItems:FindFirstChild("Candy")
     
@@ -391,6 +390,52 @@ MineTab:CreateToggle({
            end)
        end
    end,
+})
+
+-- =================================================================
+-- TAB 3: SETTINGS & INF AFK
+-- =================================================================
+local autoAntiAfk = false
+local afkConnection = nil
+
+SettingsTab:CreateToggle({
+    Name = "เปิดระบบ Inf AFK (กันหลุด 20 นาที)",
+    CurrentValue = false,
+    Flag = "AntiAfkToggle",
+    Callback = function(Value)
+        autoAntiAfk = Value
+        
+        if autoAntiAfk then
+            -- จับสัญญาณเมื่อตัวละครยืนนิ่ง (Idled) แล้วจำลองการขยับ UI
+            afkConnection = LocalPlayer.Idled:Connect(function()
+                if autoAntiAfk then
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                    Rayfield:Notify({
+                        Title = "Anti-AFK",
+                        Content = "ระบบช่วยกดกันหลุดให้แล้ว!",
+                        Duration = 2
+                    })
+                end
+            end)
+            
+            Rayfield:Notify({
+                Title = "Anti-AFK Enabled",
+                Content = "เปิดใช้งานระบบกันหลุดแล้ว",
+                Duration = 2
+            })
+        else
+            if afkConnection then
+                afkConnection:Disconnect()
+                afkConnection = nil
+            end
+            Rayfield:Notify({
+                Title = "Anti-AFK Disabled",
+                Content = "ปิดใช้งานระบบกันหลุด",
+                Duration = 2
+            })
+        end
+    end,
 })
 
 -- =================================================================
