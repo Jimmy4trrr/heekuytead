@@ -59,7 +59,7 @@ local function getItemValue(itemName)
 end
 
 -- =================================================================
--- TAB 1: AUTO CANDY & FRUIT MANAGER (NEW SYSTEM)
+-- TAB 1: AUTO CANDY & FRUIT MANAGER (SEPARATED DEPOSIT/WITHDRAW)
 -- =================================================================
 local playerItems = LocalPlayer:WaitForChild("Item")
 
@@ -72,7 +72,8 @@ local craftRemote = ReplicatedStorage:WaitForChild("RemoteEvent_Solf")
     :WaitForChild("CraftsFolder")
     :WaitForChild("Crafttable")
 
-local autoManageFruits = false
+local autoDepositFruits = false
+local autoWithdrawFruits = false
 local autoCraftCandy = false
 
 local targetFruits = {
@@ -83,21 +84,29 @@ local targetFruits = {
     "Orange"
 }
 
-local function manageFruitsLogic()
+-- ฟังก์ชั่นยัดผลไม้เข้าตู้ (เมื่อมี >= 90)
+local function depositFruitsLogic()
     for _, fruitName in ipairs(targetFruits) do
         local fruitObject = playerItems:FindFirstChild(fruitName)
-        if fruitObject then
-            if fruitObject.Value >= 90 then
-                depositRemote:FireServer(fruitName, 90)
-                task.wait(0.5)
-            elseif fruitObject.Value == 0 then
-                withdrawRemote:FireServer(fruitName, 100)
-                task.wait(0.5)
-            end
+        if fruitObject and fruitObject.Value >= 90 then
+            depositRemote:FireServer(fruitName, 90)
+            task.wait(0.5)
         end
     end
 end
 
+-- ฟังก์ชั่นเอาผลไม้ออกจากตู้ (เมื่อเหลือ 0)
+local function withdrawFruitsLogic()
+    for _, fruitName in ipairs(targetFruits) do
+        local fruitObject = playerItems:FindFirstChild(fruitName)
+        if fruitObject and fruitObject.Value == 0 then
+            withdrawRemote:FireServer(fruitName, 100)
+            task.wait(0.5)
+        end
+    end
+end
+
+-- ฟังก์ชั่นคราฟและฝาก Candy
 local function craftAndManageCandyLogic()
     local candyObject = playerItems:FindFirstChild("Candy")
     
@@ -116,11 +125,20 @@ local function craftAndManageCandyLogic()
 end
 
 CandyTab:CreateToggle({
-    Name = "ออโต้ ฝาก/ถอน ผลไม้ (5 ชนิด)",
+    Name = "ออโต้ฝากผลไม้เข้าตู้ (เมื่อครบ 90)",
     CurrentValue = false,
-    Flag = "FruitToggle",
+    Flag = "DepositFruitToggle",
     Callback = function(Value)
-        autoManageFruits = Value
+        autoDepositFruits = Value
+    end,
+})
+
+CandyTab:CreateToggle({
+    Name = "ออโต้ถอนผลไม้ออกจากตู้ (เมื่อเหลือ 0)",
+    CurrentValue = false,
+    Flag = "WithdrawFruitToggle",
+    Callback = function(Value)
+        autoWithdrawFruits = Value
     end,
 })
 
@@ -135,8 +153,12 @@ CandyTab:CreateToggle({
 
 task.spawn(function()
     while true do
-        if autoManageFruits then
-            pcall(manageFruitsLogic)
+        if autoDepositFruits then
+            pcall(depositFruitsLogic)
+        end
+
+        if autoWithdrawFruits then
+            pcall(withdrawFruitsLogic)
         end
         
         if autoCraftCandy then
@@ -208,7 +230,7 @@ local function triggerAutoUiRemote()
 end
 
 MineTab:CreateToggle({
-   Name = "Auto Farm (Iron -> Gold -> Deposit)",
+   Name = "ออโต้ฟาร์ม เศษเหล็ก เศษทอง",
    CurrentValue = false,
    Flag = "AutoFarmFlag",
    Callback = function(Value)
