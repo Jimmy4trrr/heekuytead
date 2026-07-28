@@ -59,177 +59,93 @@ local function getItemValue(itemName)
 end
 
 -- =================================================================
--- TAB 1: AUTO CANDY / FARMING SYSTEM
+-- TAB 1: AUTO CANDY & FRUIT MANAGER (NEW SYSTEM)
 -- =================================================================
-local growFolder = ReplicatedStorage:WaitForChild("Grow_vegetables")
-local plantTreeEvent = growFolder:WaitForChild("PlantTreeEvent")
-local giveWaterEvent = growFolder:WaitForChild("GiveWater")
-local giveFertilizerEvent = growFolder:WaitForChild("GiveFertilizer")
+local playerItems = LocalPlayer:WaitForChild("Item")
 
-local CENTER_CFRAME = CFrame.new(773.816345, 24.2505112, 826.843201, 0.434957385, 4.67834127e-08, -0.900451064, 7.2447004e-09, 1, 5.54550397e-08, 0.900451064, -3.06440775e-08, 0.434957385)
-local CENTER_POS = CENTER_CFRAME.Position
+local remoteSafe = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe")
+local depositRemote = remoteSafe:WaitForChild("DepositItem")
+local withdrawRemote = remoteSafe:WaitForChild("WithdrawItem")
 
-local autoCandyFarm = false
-local maxTrees = 5
-local maxRadius = 20
+local craftRemote = ReplicatedStorage:WaitForChild("RemoteEvent_Solf")
+    :WaitForChild("RemoteEventA")
+    :WaitForChild("CraftsFolder")
+    :WaitForChild("Crafttable")
 
-local targetTreeNames = {
-    ["CandyTree"] = true,
-    ["DonutsTree"] = true,
-    ["TaffyTree"] = true
+local autoManageFruits = false
+local autoCraftCandy = false
+
+local targetFruits = {
+    "Cauliflower",
+    "Corn",
+    "Peach",
+    "Grape",
+    "Orange"
 }
 
-local function getNil(name, class)
-    for _, v in next, getnilinstances() do
-        if v.ClassName == class and v.Name == name then
-            return v
-        end
-    end
-    return nil
-end
-
-local function isErrorUI()
-    return getNil("Error", "ImageLabel") ~= nil
-end
-
-local function getTargetTrees()
-    local myTrees = {}
-    local plantedFolder = Workspace:FindFirstChild("AllPlantedTrees")
-    
-    if plantedFolder then
-        for _, obj in pairs(plantedFolder:GetChildren()) do
-            if targetTreeNames[obj.Name] then
-                local treePos = nil
-                local treeCFrame = nil
-                
-                if obj:IsA("Model") and obj.PrimaryPart then
-                    treeCFrame = obj.PrimaryPart.CFrame
-                    treePos = obj.PrimaryPart.Position
-                elseif obj:IsA("BasePart") then
-                    treeCFrame = obj.CFrame
-                    treePos = obj.Position
-                elseif obj:IsA("Model") then
-                    local part = obj:FindFirstChildWhichIsA("BasePart", true)
-                    if part then
-                        treeCFrame = part.CFrame
-                        treePos = part.Position
-                    end
-                end
-                
-                if treePos and (treePos - CENTER_POS).Magnitude <= maxRadius then
-                    table.insert(myTrees, {Instance = obj, CFrame = treeCFrame, Position = treePos})
-                end
+local function manageFruitsLogic()
+    for _, fruitName in ipairs(targetFruits) do
+        local fruitObject = playerItems:FindFirstChild(fruitName)
+        if fruitObject then
+            if fruitObject.Value >= 90 then
+                depositRemote:FireServer(fruitName, 90)
+                task.wait(0.5)
+            elseif fruitObject.Value == 0 then
+                withdrawRemote:FireServer(fruitName, 100)
+                task.wait(0.5)
             end
         end
     end
-    return myTrees
 end
 
-local function walkTo(targetPosition)
-    local char = LocalPlayer.Character
-    if not char then return false end
+local function craftAndManageCandyLogic()
+    local candyObject = playerItems:FindFirstChild("Candy")
     
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    
-    if humanoid and hrp then
-        if (targetPosition - CENTER_POS).Magnitude > maxRadius then
-            targetPosition = CENTER_POS
-        end
+    local craftArgs = {
+        "SeedCandy",
+        "Recipe1",
+        "5",
+        false
+    }
+    craftRemote:FireServer(unpack(craftArgs))
 
-        humanoid:MoveTo(targetPosition)
-        
-        local timeElapsed = 0
-        while (hrp.Position - targetPosition).Magnitude > 3 and timeElapsed < 6 and autoCandyFarm do
-            task.wait(0.2)
-            timeElapsed = timeElapsed + 0.2
-        end
-        return true
+    if candyObject and candyObject.Value >= 90 then
+        depositRemote:FireServer("Candy", 90)
+        task.wait(0.5)
     end
-    return false
-end
-
-local function getPlantPositionInRadius()
-    local offsetX = math.random(-12, 12)
-    local offsetZ = math.random(-12, 12)
-    local randomPos = CENTER_POS + Vector3.new(offsetX, 0, offsetZ)
-    
-    if (randomPos - CENTER_POS).Magnitude > maxRadius then
-        return CENTER_POS
-    end
-    return randomPos
 end
 
 CandyTab:CreateToggle({
-   Name = "Auto Farm Candy",
-   CurrentValue = false,
-   Callback = function(Value)
-      autoCandyFarm = Value
-      if autoCandyFarm then
-         task.spawn(function()
-            while autoCandyFarm do
-               local currentTrees = getTargetTrees()
-               local hasError = isErrorUI()
-               
-               if not hasError and #currentTrees < maxTrees then
-                  local plantPos = getPlantPositionInRadius()
-                  
-                  walkTo(plantPos)
-                  task.wait(0.3)
-                  
-                  local char = LocalPlayer.Character
-                  if char and char:FindFirstChild("HumanoidRootPart") then
-                     local plantCFrame = char.HumanoidRootPart.CFrame
-                     plantTreeEvent:FireServer(plantCFrame)
-                     task.wait(0.8)
-                  end
-               
-               else
-                  currentTrees = getTargetTrees()
-                  
-                  if #currentTrees > 0 then
-                     for _, tree in ipairs(currentTrees) do
-                        if not autoCandyFarm then break end
-                        walkTo(tree.Position)
-                        giveWaterEvent:FireServer(tree.CFrame)
-                        task.wait(0.3)
-                     end
-                     
-                     task.wait(10)
-                     
-                     if autoCandyFarm then
-                        for _, tree in ipairs(currentTrees) do
-                           if not autoCandyFarm then break end
-                           walkTo(tree.Position)
-                           giveWaterEvent:FireServer(tree.CFrame)
-                           task.wait(0.3)
-                        end
-                     end
-                     
-                     task.wait(0.5)
-                     
-                     if autoCandyFarm then
-                        for _, tree in ipairs(currentTrees) do
-                           if not autoCandyFarm then break end
-                           walkTo(tree.Position)
-                           giveFertilizerEvent:FireServer(tree.CFrame)
-                           task.wait(0.3)
-                        end
-                     end
-                  else
-                     walkTo(CENTER_POS)
-                  end
-                  
-                  walkTo(CENTER_POS)
-                  task.wait(5)
-               end
-               
-               task.wait(0.5)
-            end
-         end)
-      end
-   end,
+    Name = "ออโต้ ฝาก/ถอน ผลไม้ (5 ชนิด)",
+    CurrentValue = false,
+    Flag = "FruitToggle",
+    Callback = function(Value)
+        autoManageFruits = Value
+    end,
 })
+
+CandyTab:CreateToggle({
+    Name = "ออโต้คราฟ Candy & ฝากเข้าตู้",
+    CurrentValue = false,
+    Flag = "CandyToggle",
+    Callback = function(Value)
+        autoCraftCandy = Value
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if autoManageFruits then
+            pcall(manageFruitsLogic)
+        end
+        
+        if autoCraftCandy then
+            pcall(craftAndManageCandyLogic)
+        end
+        
+        task.wait(1)
+    end
+end)
 
 -- =================================================================
 -- TAB 2: AUTO MINE SYSTEM
@@ -272,11 +188,11 @@ local function selectMineUIOnce(btnName)
 end
 
 local function depositMineItems()
-    local depositRemote = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("DepositItem")
+    local depositRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("DepositItem")
     
-    depositRemote:FireServer("MineGold", 500)
+    depositRemoteMine:FireServer("MineGold", 500)
     task.wait(0.3)
-    depositRemote:FireServer("MineIron", 500)
+    depositRemoteMine:FireServer("MineIron", 500)
 end
 
 local function triggerAutoUiRemote()
@@ -364,8 +280,8 @@ MineTab:CreateToggle({
                while autoWithdrawGold do
                    local val = getItemValue("MineGold")
                    if val ~= 500 then
-                       local withdrawRemote = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("WithdrawItem")
-                       withdrawRemote:FireServer("MineGold", 500)
+                       local withdrawRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("WithdrawItem")
+                       withdrawRemoteMine:FireServer("MineGold", 500)
                        
                        Rayfield:Notify({
                            Title = "Withdraw Gold",
@@ -395,8 +311,8 @@ MineTab:CreateToggle({
                while autoWithdrawIron do
                    local val = getItemValue("MineIron")
                    if val ~= 500 then
-                       local withdrawRemote = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("WithdrawItem")
-                       withdrawRemote:FireServer("MineIron", 500)
+                       local withdrawRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("WithdrawItem")
+                       withdrawRemoteMine:FireServer("MineIron", 500)
                        
                        Rayfield:Notify({
                            Title = "Withdraw Iron",
@@ -426,10 +342,10 @@ MineTab:CreateToggle({
                while autoDepositItems do
                    local ironVal = getItemValue("Iron")
                    local goldVal = getItemValue("Gold")
-                   local depositRemote = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("DepositItem")
+                   local depositRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("DepositItem")
 
                    if ironVal >= 500 then
-                       depositRemote:FireServer("Iron", 500)
+                       depositRemoteMine:FireServer("Iron", 500)
                        Rayfield:Notify({
                            Title = "Deposit Iron",
                            Content = "ฝาก Iron 500 เรียบร้อย!",
@@ -439,7 +355,7 @@ MineTab:CreateToggle({
                    end
 
                    if goldVal >= 500 then
-                       depositRemote:FireServer("Gold", 500)
+                       depositRemoteMine:FireServer("Gold", 500)
                        Rayfield:Notify({
                            Title = "Deposit Gold",
                            Content = "ฝาก Gold 500 เรียบร้อย!",
