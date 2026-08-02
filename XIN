@@ -26,6 +26,7 @@ local Window = Rayfield:CreateWindow({
 -- Tabs Breakdown
 local CandyTab    = Window:CreateTab("Auto Candy", 4483362458)
 local MineTab     = Window:CreateTab("Auto Mine", 4483362458)
+local FoodTab     = Window:CreateTab("Food & Water", 4483362458)
 local SettingsTab = Window:CreateTab("ตั้งค่า", 4483362458)
 
 -- =================================================================
@@ -102,7 +103,6 @@ end
 local function withdrawFruitsLogic()
     for _, fruitName in ipairs(targetFruits) do
         local fruitObject = playerItems:FindFirstChild(fruitName)
-        -- แก้ไขเงื่อนไข: ถอนเมื่อของต่ำกว่า 20
         if fruitObject and fruitObject.Value < 20 then
             withdrawRemote:FireServer(fruitName, 100)
             task.wait(0.5)
@@ -136,7 +136,6 @@ CandyTab:CreateToggle({
     end,
 })
 
--- แก้ไขชื่อเมนู UI ให้แสดงเป็น "เมื่อต่ำกว่า 20"
 CandyTab:CreateToggle({
     Name = "ออโต้ถอนผลไม้ออกจากตู้ (ต่ำกว่า 20)",
     CurrentValue = false,
@@ -398,7 +397,116 @@ MineTab:CreateToggle({
 })
 
 -- =================================================================
--- TAB 3: SETTINGS, INF AFK & TELEPORT
+-- TAB 3: AUTO EAT & BUY FOOD & WATER SYSTEM
+-- =================================================================
+local autoEatFood = false
+local autoBuyFood = false
+
+local bagRemote = ReplicatedStorage:WaitForChild("RemoteEvent_Solf")
+    :WaitForChild("RemoteEventA")
+    :WaitForChild("Bag")
+
+local shopRemote = ReplicatedStorage:WaitForChild("ShopEvent")
+
+local function getHold()
+    return LocalPlayer.PlayerGui.Backpack_Never.Check.hold
+end
+
+local function getDelay()
+    return LocalPlayer.PlayerGui.Backpack_Never.Check.delay
+end
+
+FoodTab:CreateToggle({
+    Name = "ออโต้กินอาหาร น้ำ",
+    CurrentValue = false,
+    Flag = "AutoEatFoodToggle",
+    Callback = function(Value)
+        autoEatFood = Value
+        if autoEatFood then
+            task.spawn(function()
+                while autoEatFood do
+                    pcall(function()
+                        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+                        local statusHud = playerGui and playerGui:FindFirstChild("controler") and playerGui.controler.Status.Hud
+                        
+                        if statusHud then
+                            local hungerTextObj = statusHud.hunger.Amount
+                            local thirstTextObj = statusHud.thirst.Amount
+
+                            local hungerVal = tonumber(hungerTextObj.Text) or tonumber(hungerTextObj.txet) or 100
+                            local thirstVal = tonumber(thirstTextObj.Text) or tonumber(thirstTextObj.txet) or 100
+
+                            -- 1. ลำดับกิน Onigiri ก่อนเมื่อความหิว <= 79
+                            if hungerVal <= 79 then
+                                bagRemote:FireServer("Use", "Onigiri", getHold(), getDelay())
+                                Rayfield:Notify({
+                                    Title = "Auto Eat",
+                                    Content = "กิน Onigiri เรียบร้อย! รอคูลดาวน์ 12 วิ...",
+                                    Duration = 3
+                                })
+                                task.wait(12)
+
+                            -- 2. ถ้าความหิวไม่อยู่ในเงื่อนไข ค่อยกิน Water เมื่อความกระหาย <= 79
+                            elseif thirstVal <= 79 then
+                                bagRemote:FireServer("Use", "Water", getHold(), getDelay())
+                                Rayfield:Notify({
+                                    Title = "Auto Drink",
+                                    Content = "ดื่ม Water เรียบร้อย! รอคูลดาวน์ 12 วิ...",
+                                    Duration = 3
+                                })
+                                task.wait(12)
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+FoodTab:CreateToggle({
+    Name = "ออโต้ซื้ออาหาร/น้ำ",
+    CurrentValue = false,
+    Flag = "AutoBuyFoodToggle",
+    Callback = function(Value)
+        autoBuyFood = Value
+        if autoBuyFood then
+            task.spawn(function()
+                while autoBuyFood do
+                    pcall(function()
+                        local onigiriVal = getItemValue("Onigiri")
+                        local waterVal = getItemValue("Water")
+
+                        if onigiriVal <= 0 then
+                            shopRemote:FireServer("Buy", "Onigiri", 10)
+                            Rayfield:Notify({
+                                Title = "Auto Buy",
+                                Content = "ซื้อ Onigiri x10 เรียบร้อย!",
+                                Duration = 2.5
+                            })
+                            task.wait(1)
+                        end
+
+                        if waterVal <= 0 then
+                            shopRemote:FireServer("Buy", "Water", 10)
+                            Rayfield:Notify({
+                                Title = "Auto Buy",
+                                Content = "ซื้อ Water x10 เรียบร้อย!",
+                                Duration = 2.5
+                            })
+                            task.wait(1)
+                        end
+                    end)
+                    task.wait(2)
+                end
+            end)
+        end
+    end,
+})
+
+-- =================================================================
+-- TAB 4: SETTINGS, INF AFK & TELEPORT
 -- =================================================================
 local autoAntiAfk = false
 local afkConnection = nil
