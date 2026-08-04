@@ -315,7 +315,7 @@ MineTab:CreateToggle({
                        })
                    end
                    
-                   for i = 1, 10 do
+                   for i = 1, 2 do
                        if not autoWithdrawGold then break end
                        task.wait(1)
                    end
@@ -346,7 +346,7 @@ MineTab:CreateToggle({
                        })
                    end
                    
-                   for i = 1, 10 do
+                   for i = 1, 2 do
                        if not autoWithdrawIron then break end
                        task.wait(1)
                    end
