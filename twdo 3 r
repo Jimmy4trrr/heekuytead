@@ -1,0 +1,521 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "The Walking Dead Online 3 Roblox",
+    SubTitle = "BY KUYRAISUS",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Theme = "Dark"
+})
+
+local Tabs = {
+    Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "crosshair" }),
+    ESP = Window:AddTab({ Title = "Visuals (ESP)", Icon = "eye" }),
+    Teleport = Window:AddTab({ Title = "Teleport", Icon = "map-pin" }),
+    Misc = Window:AddTab({ Title = "Misc / Weapon", Icon = "shield" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Remote Event
+local FightEvent = ReplicatedStorage:WaitForChild("CLIENT_REMOTES"):WaitForChild("Fight")
+
+-- System Variables
+local AimbotEnabled = false
+local AimTargetPart = "Head"
+local FOVRadius = 100
+local ShowFOV = false
+local AimSmoothing = 1
+local MaxDistance = 1000
+
+local ESPMaster = false
+local ESPBox = true
+local ESPName = true
+local ESPDistance = true
+local ESPHealth = true
+
+local NoRecoilEnabled = false
+local NoclipEnabled = false
+local SelectedPlayerName = nil
+
+local KillAuraEnabled = false
+local KillAuraRange = 25
+local TargetNPCs = true
+
+-- FOV Circle Drawing
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+---------------------------------------------------------
+-- ADVANCED ESP SYSTEM (DRAWING BASED)
+---------------------------------------------------------
+local ESPObjects = {}
+
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+
+    local objects = {
+        Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        HealthBarOutline = Drawing.new("Square"),
+        HealthBar = Drawing.new("Square")
+    }
+
+    -- Box Settings
+    objects.Box.Color = Color3.fromRGB(255, 50, 50)
+    objects.Box.Thickness = 2
+    objects.Box.Filled = false
+    objects.Box.Visible = false
+
+    -- Name Settings
+    objects.Name.Color = Color3.fromRGB(255, 255, 255)
+    objects.Name.Size = 16
+    objects.Name.Center = true
+    objects.Name.Outline = true
+    objects.Name.OutlineColor = Color3.fromRGB(0, 0, 0)
+    objects.Name.Visible = false
+
+    -- Distance Settings
+    objects.Distance.Color = Color3.fromRGB(220, 220, 220)
+    objects.Distance.Size = 14
+    objects.Distance.Center = true
+    objects.Distance.Outline = true
+    objects.Distance.OutlineColor = Color3.fromRGB(0, 0, 0)
+    objects.Distance.Visible = false
+
+    -- Health Bar Settings
+    objects.HealthBarOutline.Color = Color3.fromRGB(0, 0, 0)
+    objects.HealthBarOutline.Thickness = 1
+    objects.HealthBarOutline.Filled = true
+    objects.HealthBarOutline.Visible = false
+
+    objects.HealthBar.Color = Color3.fromRGB(0, 255, 0)
+    objects.HealthBar.Thickness = 2.5
+    objects.HealthBar.Filled = true
+    objects.HealthBar.Visible = false
+
+    ESPObjects[player] = objects
+end
+
+local function RemoveESP(player)
+    if ESPObjects[player] then
+        for _, obj in pairs(ESPObjects[player]) do
+            obj:Remove()
+        end
+        ESPObjects[player] = nil
+    end
+end
+
+for _, p in pairs(Players:GetPlayers()) do CreateESP(p) end
+Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerRemoving:Connect(RemoveESP)
+
+-- ESP Update Loop
+RunService.RenderStepped:Connect(function()
+    for player, objs in pairs(ESPObjects) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if ESPMaster and char and hrp and hum and hum.Health > 0 then
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+            if onScreen then
+                local head = char:FindFirstChild("Head")
+                local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
+                local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3.5, 0))
+
+                local height = math.abs(headPos.Y - legPos.Y)
+                local width = height / 1.8
+
+                -- 1. Box ESP
+                if ESPBox then
+                    objs.Box.Size = Vector2.new(width, height)
+                    objs.Box.Position = Vector2.new(pos.X - width / 2, pos.Y - height / 2)
+                    objs.Box.Visible = true
+                else
+                    objs.Box.Visible = false
+                end
+
+                -- 2. Name ESP
+                if ESPName then
+                    objs.Name.Text = player.DisplayName or player.Name
+                    objs.Name.Position = Vector2.new(pos.X, pos.Y - height / 2 - 20)
+                    objs.Name.Visible = true
+                else
+                    objs.Name.Visible = false
+                end
+
+                -- 3. Distance ESP
+                if ESPDistance then
+                    local dist = math.floor((hrp.Position - Camera.CFrame.Position).Magnitude)
+                    objs.Distance.Text = "[" .. dist .. "m]"
+                    objs.Distance.Position = Vector2.new(pos.X, pos.Y + height / 2 + 4)
+                    objs.Distance.Visible = true
+                else
+                    objs.Distance.Visible = false
+                end
+
+                -- 4. Health Bar ESP
+                if ESPHealth then
+                    local healthPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    local barHeight = height * healthPercent
+
+                    objs.HealthBarOutline.Size = Vector2.new(4, height + 2)
+                    objs.HealthBarOutline.Position = Vector2.new(pos.X - width / 2 - 8, pos.Y - height / 2 - 1)
+                    objs.HealthBarOutline.Visible = true
+
+                    objs.HealthBar.Size = Vector2.new(2, barHeight)
+                    objs.HealthBar.Position = Vector2.new(pos.X - width / 2 - 7, (pos.Y + height / 2) - barHeight)
+                    objs.HealthBar.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthPercent)
+                    objs.HealthBar.Visible = true
+                else
+                    objs.HealthBarOutline.Visible = false
+                    objs.HealthBar.Visible = false
+                end
+            else
+                for _, obj in pairs(objs) do obj.Visible = false end
+            end
+        else
+            for _, obj in pairs(objs) do obj.Visible = false end
+        end
+    end
+end)
+
+---------------------------------------------------------
+-- AIMBOT & MISC LOGIC
+---------------------------------------------------------
+local function GetClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = FOVRadius
+
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(AimTargetPart) and player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local targetPart = player.Character[AimTargetPart]
+            
+            local worldDist = (targetPart.Position - myHRP.Position).Magnitude
+            if worldDist <= MaxDistance then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+
+                if onScreen then
+                    local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- Main Loop (Aimbot, FOV & Noclip)
+RunService.Stepped:Connect(function()
+    if NoclipEnabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Visible = ShowFOV
+    FOVCircle.Radius = FOVRadius
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    if AimbotEnabled then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild(AimTargetPart) then
+            local targetPos = target.Character[AimTargetPart].Position
+            local currentCamCFrame = Camera.CFrame
+            local targetCFrame = CFrame.new(currentCamCFrame.Position, targetPos)
+            
+            Camera.CFrame = currentCamCFrame:Lerp(targetCFrame, 1 / AimSmoothing)
+        end
+    end
+end)
+
+local function ToggleNoRecoil(val)
+    NoRecoilEnabled = val
+    task.spawn(function()
+        while NoRecoilEnabled do
+            task.wait(0.1)
+            for _, v in pairs(getgc(true)) do
+                if type(v) == "table" then
+                    if rawget(v, "Recoil") or rawget(v, "recoil") then
+                        v.Recoil = 0
+                        v.recoil = 0
+                    end
+                    if rawget(v, "CameraShake") or rawget(v, "recoilShift") then
+                        v.CameraShake = 0
+                        v.recoilShift = 0
+                    end
+                end
+            end
+        end
+    end)
+end
+
+---------------------------------------------------------
+-- KILL AURA LOGIC
+---------------------------------------------------------
+local function AttackTarget(targetPart)
+    if not targetPart then return end
+    
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+
+    local attackPos = targetPart.Position
+    local attackCFrame = CFrame.new(myHRP.Position, attackPos)
+
+    FightEvent:FireServer("Use1", attackPos, attackCFrame)
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        
+        if KillAuraEnabled then
+            local myChar = LocalPlayer.Character
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+            if myHRP then
+                -- 1. โจมตีผู้เล่น
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character then
+                        local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                        local targetHum = player.Character:FindFirstChildOfClass("Humanoid")
+
+                        if targetHRP and targetHum and targetHum.Health > 0 then
+                            local dist = (targetHRP.Position - myHRP.Position).Magnitude
+                            if dist <= KillAuraRange then
+                                AttackTarget(targetHRP)
+                            end
+                        end
+                    end
+                end
+
+                -- 2. โจมตี NPC / Zombie
+                if TargetNPCs then
+                    for _, obj in pairs(workspace:GetDescendants()) do
+                        if obj:IsA("Humanoid") and obj.Parent ~= myChar and obj.Health > 0 then
+                            if not Players:GetPlayerFromCharacter(obj.Parent) then
+                                local targetHRP = obj.Parent:FindFirstChild("HumanoidRootPart") or obj.Parent:FindFirstChild("PrimaryPart")
+                                if targetHRP then
+                                    local dist = (targetHRP.Position - myHRP.Position).Magnitude
+                                    if dist <= KillAuraRange then
+                                        AttackTarget(targetHRP)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------
+-- HELPER FUNCTIONS FOR TELEPORT
+---------------------------------------------------------
+local function GetPlayerList()
+    local list = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list, p.Name)
+        end
+    end
+    if #list == 0 then
+        table.insert(list, "ไม่พบผู้เล่นอื่น")
+    end
+    return list
+end
+
+---------------------------------------------------------
+-- UI CONTROLS (Fluent)
+---------------------------------------------------------
+
+-- Tab: Aimbot
+local AimbotToggle = Tabs.Aimbot:AddToggle("AimbotToggle", { Title = "เปิดใช้งาน Aimbot", Default = false })
+AimbotToggle:OnChanged(function(Value) AimbotEnabled = Value end)
+
+local TargetDropdown = Tabs.Aimbot:AddDropdown("AimTarget", {
+    Title = "ตำแหน่งที่ต้องการล็อค",
+    Values = {"หัว (Head)", "ลำตัว (Torso)"},
+    Multi = false,
+    Default = 1,
+})
+TargetDropdown:OnChanged(function(Value)
+    if Value == "หัว (Head)" then
+        AimTargetPart = "Head"
+    else
+        AimTargetPart = "HumanoidRootPart"
+    end
+end)
+
+local DistanceSlider = Tabs.Aimbot:AddSlider("MaxDistanceSlider", {
+    Title = "ระยะล็อคเป้าสูงสุด",
+    Min = 50,
+    Max = 1000,
+    Default = 1000,
+    Rounding = 0,
+})
+DistanceSlider:OnChanged(function(Value) MaxDistance = Value end)
+
+local FOVToggle = Tabs.Aimbot:AddToggle("FOVToggle", { Title = "แสดงวงกลม FOV", Default = false })
+FOVToggle:OnChanged(function(Value) ShowFOV = Value end)
+
+local FOVSlider = Tabs.Aimbot:AddSlider("FOVSlider", {
+    Title = "ขนาดระยะ FOV",
+    Min = 30,
+    Max = 500,
+    Default = 100,
+    Rounding = 0,
+})
+FOVSlider:OnChanged(function(Value) FOVRadius = Value end)
+
+local SmoothSlider = Tabs.Aimbot:AddSlider("Smoothness", {
+    Title = "Smooth",
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Rounding = 1,
+})
+SmoothSlider:OnChanged(function(Value) AimSmoothing = Value end)
+
+-- Tab: ESP
+local ESPMasterToggle = Tabs.ESP:AddToggle("ESPMasterToggle", { Title = "ESP", Default = false })
+ESPMasterToggle:OnChanged(function(Value) ESPMaster = Value end)
+
+local BoxToggle = Tabs.ESP:AddToggle("ESPBoxToggle", { Title = "แสดงกรอบสีแดง", Default = true })
+BoxToggle:OnChanged(function(Value) ESPBox = Value end)
+
+local NameToggle = Tabs.ESP:AddToggle("ESPNameToggle", { Title = "แสดงชื่อ", Default = true })
+NameToggle:OnChanged(function(Value) ESPName = Value end)
+
+local DistanceToggle = Tabs.ESP:AddToggle("ESPDistanceToggle", { Title = "แสดงระยะทาง", Default = true })
+DistanceToggle:OnChanged(function(Value) ESPDistance = Value end)
+
+local HealthToggle = Tabs.ESP:AddToggle("ESPHealthToggle", { Title = "แสดงหลอดเลือด", Default = true })
+HealthToggle:OnChanged(function(Value) ESPHealth = Value end)
+
+-- Tab: Teleport
+Tabs.Teleport:AddButton({
+    Title = "วาร์ปไป ดาวเทียม",
+    Description = "Teleport to (-1813.34, 293.44, 918.42)",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = CFrame.new(-1813.34119, 293.449188, 918.427612, 0.554074824, -3.0942477e-08, -0.8324669, -7.37984038e-08, 1, -8.62884946e-08, 0.8324669, 1.09245001e-07, 0.554074824)
+        end
+    end
+})
+
+Tabs.Teleport:AddButton({
+    Title = "วาร์ปไป ค่ายทหาร",
+    Description = "Teleport to Military Base",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = CFrame.new(5301.90527, 128.96936, -5810.20117, -0.197004408, 4.53042581e-09, -0.980402589, 5.34804157e-09, 1, 3.546337e-09, 0.980402589, -4.54458959e-09, -0.197004408)
+        end
+    end
+})
+
+-- Player Teleport System
+local PlayerDropdown = Tabs.Teleport:AddDropdown("PlayerTPDropdown", {
+    Title = "เลือกผู้เล่นที่ต้องการวาร์ปหา",
+    Values = GetPlayerList(),
+    Multi = false,
+    Default = 1,
+})
+
+PlayerDropdown:OnChanged(function(Value)
+    SelectedPlayerName = Value
+end)
+
+Tabs.Teleport:AddButton({
+    Title = "รีเฟรชรายชื่อผู้เล่น",
+    Description = "อัปเดตรายชื่อผู้เล่นในเซิร์ฟเวอร์",
+    Callback = function()
+        PlayerDropdown:SetValues(GetPlayerList())
+    end
+})
+
+Tabs.Teleport:AddButton({
+    Title = "วาร์ปไปหาผู้เล่นที่เลือก",
+    Description = "Teleport to Target Player",
+    Callback = function()
+        if SelectedPlayerName and SelectedPlayerName ~= "ไม่พบผู้เล่นอื่น" then
+            local targetPlayer = Players:FindFirstChild(SelectedPlayerName)
+            if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local myChar = LocalPlayer.Character
+                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if myHRP then
+                    myHRP.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                end
+            else
+                Fluent:Notify({
+                    Title = "Teleport Error",
+                    Content = "ไม่พบตัวละครของผู้เล่นเป้าหมาย",
+                    Duration = 3
+                })
+            end
+        end
+    end
+})
+
+-- Tab: Misc / Weapon
+local NoclipToggle = Tabs.Misc:AddToggle("NoclipToggle", { Title = "Noclip", Default = false })
+NoclipToggle:OnChanged(function(Value) NoclipEnabled = Value end)
+
+local RecoilToggle = Tabs.Misc:AddToggle("RecoilToggle", { Title = "No Recoil", Default = false })
+RecoilToggle:OnChanged(function(Value) ToggleNoRecoil(Value) end)
+
+local KillAuraToggle = Tabs.Misc:AddToggle("KillAuraToggle", { Title = "เปิดใช้งาน Kill Aura", Default = false })
+KillAuraToggle:OnChanged(function(Value) KillAuraEnabled = Value end)
+
+local KillAuraRangeSlider = Tabs.Misc:AddSlider("KillAuraRangeSlider", {
+    Title = "ระยะ Kill Aura",
+    Min = 5,
+    Max = 50,
+    Default = 25,
+    Rounding = 0,
+})
+KillAuraRangeSlider:OnChanged(function(Value) KillAuraRange = Value end)
+
+local NPCToggle = Tabs.Misc:AddToggle("NPCToggle", { Title = "โจมตี Zombie / NPC", Default = true })
+NPCToggle:OnChanged(function(Value) TargetNPCs = Value end)
+
+-- Save System Setup
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:BuildConfigSection(Tabs.Settings)
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+Window:SelectTab(1)
