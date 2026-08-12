@@ -1,0 +1,654 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Services
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Target CFrame Location
+local targetCFrame = CFrame.new(9912.92188, 1222.42676, 518.078064, 0.949611604, -5.23633368e-08, 0.313429028, 5.09462836e-08, 1, 1.27114967e-08, -0.313429028, 3.89705912e-09, 0.949611604)
+
+-- =================================================================
+-- WINDOW CREATION
+-- =================================================================
+local Window = Rayfield:CreateWindow({
+    Name = "NEVER TOWN OFFICIAL",
+    LoadingTitle = "Loading Script...",
+    LoadingSubtitle = "BY KUYRAISUS",
+    ConfigurationSaving = { Enabled = false }
+})
+
+-- Tabs Breakdown
+local OPHeadTab   = Window:CreateTab("OP Head", 4483362458)
+local CandyTab    = Window:CreateTab("Auto Candy", 4483362458)
+local MineTab     = Window:CreateTab("Auto Mine", 4483362458)
+local FoodTab     = Window:CreateTab("Food & Water", 4483362458)
+local SettingsTab = Window:CreateTab("ตั้งค่า", 4483362458)
+
+-- =================================================================
+-- TAB 0: OP HEAD SPOOFER SYSTEM
+-- =================================================================
+local headSpoofChance = 0 -- 0 = Off, 100 = 100%, 70 = 70%, 50 = 50%
+
+if not getgenv().TargetSpoof_Hooked then
+    getgenv().TargetSpoof_Hooked = true
+
+    local originalIndex
+    originalIndex = hookmetamethod(game, "__index", newcclosure(function(self, property)
+        if headSpoofChance > 0 and not checkcaller() and property == "Name" then
+            if typeof(self) == "Instance" and self:IsA("BasePart") then
+                local callerScript = getcallingscript()
+                if callerScript and (callerScript.Name == "LocalScript" or (callerScript.Parent and callerScript.Parent:IsA("Tool"))) then
+                    -- คำนวณตาม % ที่เลือก
+                    if headSpoofChance >= 100 or math.random(1, 100) <= headSpoofChance then
+                        return "Head"
+                    end
+                end
+            end
+        end
+        return originalIndex(self, property)
+    end))
+end
+
+local Toggle100, Toggle70, Toggle50
+
+Toggle100 = OPHeadTab:CreateToggle({
+    Name = "หัว 100%",
+    CurrentValue = false,
+    Flag = "Head100Toggle",
+    Callback = function(Value)
+        if Value then
+            headSpoofChance = 100
+            Toggle70:Set(false)
+            Toggle50:Set(false)
+        elseif headSpoofChance == 100 then
+            headSpoofChance = 0
+        end
+    end,
+})
+
+Toggle70 = OPHeadTab:CreateToggle({
+    Name = "หัว 70%",
+    CurrentValue = false,
+    Flag = "Head70Toggle",
+    Callback = function(Value)
+        if Value then
+            headSpoofChance = 70
+            Toggle100:Set(false)
+            Toggle50:Set(false)
+        elseif headSpoofChance == 70 then
+            headSpoofChance = 0
+        end
+    end,
+})
+
+Toggle50 = OPHeadTab:CreateToggle({
+    Name = "หัว 50%",
+    CurrentValue = false,
+    Flag = "Head50Toggle",
+    Callback = function(Value)
+        if Value then
+            headSpoofChance = 50
+            Toggle100:Set(false)
+            Toggle70:Set(false)
+        elseif headSpoofChance == 50 then
+            headSpoofChance = 0
+        end
+    end,
+})
+
+-- =================================================================
+-- SYSTEM 1: INSTANT PROXIMITY PROMPT & INPUT HELPER
+-- =================================================================
+local function makeInstant(prompt)
+    if prompt:IsA("ProximityPrompt") then
+        prompt.HoldDuration = 0
+    end
+end
+
+for _, v in ipairs(game:GetDescendants()) do
+    makeInstant(v)
+end
+game.DescendantAdded:Connect(makeInstant)
+
+local function pressKey(keyCode)
+    VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+    task.wait(0.05)
+end
+
+local function pressE()
+    pressKey(Enum.KeyCode.E)
+end
+
+local function getItemValue(itemName)
+    local itemFolder = LocalPlayer:FindFirstChild("Item")
+    if not itemFolder then return 0 end
+    
+    local itemObj = itemFolder:FindFirstChild(itemName)
+    if not itemObj then return 0 end
+    
+    return itemObj.Value or itemObj.value or 0
+end
+
+-- =================================================================
+-- TAB 1: AUTO CANDY & FRUIT MANAGER
+-- =================================================================
+local playerItems = LocalPlayer:WaitForChild("Item")
+
+local remoteSafe = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe")
+local depositRemote = remoteSafe:WaitForChild("DepositItem")
+local withdrawRemote = remoteSafe:WaitForChild("WithdrawItem")
+
+local craftRemote = ReplicatedStorage:WaitForChild("RemoteEvent_Solf")
+    :WaitForChild("RemoteEventA")
+    :WaitForChild("CraftsFolder")
+    :WaitForChild("Crafttable")
+
+local autoDepositFruits = false
+local autoWithdrawFruits = false
+local autoCraftCandy = false
+
+local targetFruits = {
+    "Cauliflower",
+    "Corn",
+    "Peach",
+    "Grape",
+    "Orange"
+}
+
+local function depositFruitsLogic()
+    for _, fruitName in ipairs(targetFruits) do
+        local fruitObject = playerItems:FindFirstChild(fruitName)
+        if fruitObject and fruitObject.Value >= 90 then
+            depositRemote:FireServer(fruitName, 90)
+            task.wait(0.5)
+        end
+    end
+end
+
+local function withdrawFruitsLogic()
+    for _, fruitName in ipairs(targetFruits) do
+        local fruitObject = playerItems:FindFirstChild(fruitName)
+        if fruitObject and fruitObject.Value < 20 then
+            withdrawRemote:FireServer(fruitName, 100)
+            task.wait(0.5)
+        end
+    end
+end
+
+local function craftAndManageCandyLogic()
+    local candyObject = playerItems:FindFirstChild("Candy")
+    
+    local craftArgs = {
+        "SeedCandy",
+        "Recipe1",
+        "5",
+        false
+    }
+    craftRemote:FireServer(unpack(craftArgs))
+
+    if candyObject and candyObject.Value >= 90 then
+        depositRemote:FireServer("Candy", 90)
+        task.wait(0.5)
+    end
+end
+
+CandyTab:CreateToggle({
+    Name = "ออโต้ฝากผลไม้เข้าตู้ (ถ้าครบ 90)",
+    CurrentValue = false,
+    Flag = "DepositFruitToggle",
+    Callback = function(Value)
+        autoDepositFruits = Value
+    end,
+})
+
+CandyTab:CreateToggle({
+    Name = "ออโต้ถอนผลไม้ออกจากตู้ (ต่ำกว่า 20)",
+    CurrentValue = false,
+    Flag = "WithdrawFruitToggle",
+    Callback = function(Value)
+        autoWithdrawFruits = Value
+    end,
+})
+
+CandyTab:CreateToggle({
+    Name = "ออโต้คราฟ Candy & ยัดเข้าตู้",
+    CurrentValue = false,
+    Flag = "CandyToggle",
+    Callback = function(Value)
+        autoCraftCandy = Value
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if autoDepositFruits then
+            pcall(depositFruitsLogic)
+        end
+
+        if autoWithdrawFruits then
+            pcall(withdrawFruitsLogic)
+        end
+        
+        if autoCraftCandy then
+            pcall(craftAndManageCandyLogic)
+        end
+        
+        task.wait(1)
+    end
+end)
+
+-- =================================================================
+-- TAB 2: AUTO MINE SYSTEM
+-- =================================================================
+local autoMineFarm = false
+local autoWithdrawGold = false
+local autoWithdrawIron = false
+local autoDepositItems = false
+
+local function getFrameX()
+    local autoMineUI = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("AutoMine")
+    if not autoMineUI then return nil end
+    local frame = autoMineUI:FindFirstChild("Frame")
+    if not frame then return nil end
+    for _, child in ipairs(frame:GetChildren()) do
+        if child.Name:find("Frame_X") then return child end
+    end
+    return nil
+end
+
+local function selectMineUIOnce(btnName)
+    local frameX = getFrameX()
+    if not frameX then return false end
+    
+    local btn = frameX:FindFirstChild(btnName)
+    if not btn then return false end
+
+    GuiService.SelectedObject = btn
+    task.wait(0.1)
+
+    pressKey(Enum.KeyCode.Return)
+    pressKey(Enum.KeyCode.Space)
+    pressKey(Enum.KeyCode.ButtonA)
+
+    task.wait(0.1)
+    GuiService.SelectedObject = nil
+    pressKey(Enum.KeyCode.BackSlash)
+    
+    return true
+end
+
+local function depositMineItems()
+    local depositRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("DepositItem")
+    
+    depositRemoteMine:FireServer("MineGold", 500)
+    task.wait(0.3)
+    depositRemoteMine:FireServer("MineIron", 500)
+end
+
+local function triggerAutoUiRemote()
+    pcall(function()
+        LocalPlayer:WaitForChild("PlayerGui")
+                   :WaitForChild("AutoUi")
+                   :WaitForChild("Frame")
+                   :WaitForChild("TextButton")
+                   :WaitForChild("LocalScript")
+                   :WaitForChild("RemoteEvent")
+                   :FireServer()
+    end)
+end
+
+MineTab:CreateToggle({
+   Name = "ออโต้ฟาร์ม เศษเหล็ก เศษทอง",
+   CurrentValue = false,
+   Flag = "AutoFarmFlag",
+   Callback = function(Value)
+       autoMineFarm = Value
+       
+       if autoMineFarm then
+           task.spawn(function()
+               local currentState = "NONE"
+
+               while autoMineFarm do
+                   local ironValue = getItemValue("MineIron")
+                   local goldValue = getItemValue("MineGold")
+
+                   if ironValue < 500 then
+                       if currentState ~= "IRON" then
+                           pressE()
+                           task.wait(0.5)
+                           selectMineUIOnce("MineIron")
+                           currentState = "IRON"
+                       end
+
+                   elseif ironValue >= 500 and goldValue < 500 then
+                       if currentState ~= "GOLD" then
+                           triggerAutoUiRemote()
+                           Rayfield:Notify({
+                               Title = "Iron 500 Reached",
+                               Content = "เหล็กครบ 500",
+                               Duration = 2.5
+                           })
+                           task.wait(0.5)
+
+                           pressE()
+                           task.wait(0.5)
+                           selectMineUIOnce("MineGold")
+                           currentState = "GOLD"
+                       end
+
+                   elseif goldValue >= 500 then
+                       triggerAutoUiRemote()
+                       task.wait(0.3)
+
+                       depositMineItems()
+                       
+                       Rayfield:Notify({
+                           Title = "Gold 500 & Deposit",
+                           Content = "ทองครบ 500",
+                           Duration = 3
+                       })
+                       
+                       currentState = "NONE"
+                       task.wait(2)
+                   end
+
+                   task.wait(0.5)
+               end
+           end)
+       end
+   end,
+})
+
+MineTab:CreateToggle({
+   Name = "ดึงทองถ้าไม่เท่ากับ 500",
+   CurrentValue = false,
+   Flag = "AutoWithdrawGoldFlag",
+   Callback = function(Value)
+       autoWithdrawGold = Value
+       if autoWithdrawGold then
+           task.spawn(function()
+               while autoWithdrawGold do
+                   local val = getItemValue("MineGold")
+                   if val ~= 500 then
+                       local withdrawRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("WithdrawItem")
+                       withdrawRemoteMine:FireServer("MineGold", 500)
+                       
+                       Rayfield:Notify({
+                           Title = "Withdraw Gold",
+                           Content = "ดึง MineGold 500",
+                           Duration = 2
+                       })
+                   end
+                   
+                   for i = 1, 2 do
+                       if not autoWithdrawGold then break end
+                       task.wait(1)
+                   end
+               end
+           end)
+       end
+   end,
+})
+
+MineTab:CreateToggle({
+   Name = "ดึงเหล็กถ้าไม่เท่ากับ 500",
+   CurrentValue = false,
+   Flag = "AutoWithdrawIronFlag",
+   Callback = function(Value)
+       autoWithdrawIron = Value
+       if autoWithdrawIron then
+           task.spawn(function()
+               while autoWithdrawIron do
+                   local val = getItemValue("MineIron")
+                   if val ~= 500 then
+                       local withdrawRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("WithdrawItem")
+                       withdrawRemoteMine:FireServer("MineIron", 500)
+                       
+                       Rayfield:Notify({
+                           Title = "Withdraw Iron",
+                           Content = "ดึง MineIron 500",
+                           Duration = 2
+                       })
+                   end
+                   
+                   for i = 1, 2 do
+                       if not autoWithdrawIron then break end
+                       task.wait(1)
+                   end
+               end
+           end)
+       end
+   end,
+})
+
+MineTab:CreateToggle({
+   Name = "ยัดของเข้าตู้",
+   CurrentValue = false,
+   Flag = "AutoDepositItemsFlag",
+   Callback = function(Value)
+       autoDepositItems = Value
+       if autoDepositItems then
+           task.spawn(function()
+               while autoDepositItems do
+                   local ironVal = getItemValue("Iron")
+                   local goldVal = getItemValue("Gold")
+                   local depositRemoteMine = ReplicatedStorage:WaitForChild("Game_Modules"):WaitForChild("RemoteEventSafe"):WaitForChild("DepositItem")
+
+                   if ironVal >= 500 then
+                       depositRemoteMine:FireServer("Iron", 500)
+                       Rayfield:Notify({
+                           Title = "Deposit Iron",
+                           Content = "ฝาก Iron 500 เรียบร้อย!",
+                           Duration = 2
+                       })
+                       task.wait(0.5)
+                   end
+
+                   if goldVal >= 500 then
+                       depositRemoteMine:FireServer("Gold", 500)
+                       Rayfield:Notify({
+                           Title = "Deposit Gold",
+                           Content = "ฝาก Gold 500 เรียบร้อย!",
+                           Duration = 2
+                       })
+                       task.wait(0.5)
+                   end
+
+                   task.wait(1)
+               end
+           end)
+       end
+   end,
+})
+
+-- =================================================================
+-- TAB 3: AUTO EAT & BUY FOOD & WATER SYSTEM
+-- =================================================================
+local autoEatFood = false
+local autoBuyFood = false
+
+local bagRemote = ReplicatedStorage:WaitForChild("RemoteEvent_Solf")
+    :WaitForChild("RemoteEventA")
+    :WaitForChild("Bag")
+
+local shopRemote = ReplicatedStorage:WaitForChild("ShopEvent")
+
+local function getHold()
+    return LocalPlayer.PlayerGui.Backpack_Never.Check.hold
+end
+
+local function getDelay()
+    return LocalPlayer.PlayerGui.Backpack_Never.Check.delay
+end
+
+FoodTab:CreateToggle({
+    Name = "ออโต้กินอาหาร น้ำ",
+    CurrentValue = false,
+    Flag = "AutoEatFoodToggle",
+    Callback = function(Value)
+        autoEatFood = Value
+        if autoEatFood then
+            task.spawn(function()
+                while autoEatFood do
+                    pcall(function()
+                        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+                        local statusHud = playerGui and playerGui:FindFirstChild("controler") and playerGui.controler.Status.Hud
+                        
+                        if statusHud then
+                            local hungerTextObj = statusHud.hunger.Amount
+                            local thirstTextObj = statusHud.thirst.Amount
+
+                            local hungerVal = tonumber(hungerTextObj.Text) or tonumber(hungerTextObj.txet) or 100
+                            local thirstVal = tonumber(thirstTextObj.Text) or tonumber(thirstTextObj.txet) or 100
+
+                            -- 1. ลำดับกิน Onigiri ก่อนเมื่อความหิว <= 79
+                            if hungerVal <= 79 then
+                                bagRemote:FireServer("Use", "Onigiri", getHold(), getDelay())
+                                Rayfield:Notify({
+                                    Title = "Auto Eat",
+                                    Content = "กิน Onigiri เรียบร้อย! รอคูลดาวน์ 12 วิ...",
+                                    Duration = 3
+                                })
+                                task.wait(12)
+
+                            -- 2. ถ้าความหิวไม่อยู่ในเงื่อนไข ค่อยกิน Water เมื่อความกระหาย <= 79
+                            elseif thirstVal <= 79 then
+                                bagRemote:FireServer("Use", "Water", getHold(), getDelay())
+                                Rayfield:Notify({
+                                    Title = "Auto Drink",
+                                    Content = "ดื่ม Water เรียบร้อย! รอคูลดาวน์ 12 วิ...",
+                                    Duration = 3
+                                })
+                                task.wait(12)
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+FoodTab:CreateToggle({
+    Name = "ออโต้ซื้ออาหาร/น้ำ",
+    CurrentValue = false,
+    Flag = "AutoBuyFoodToggle",
+    Callback = function(Value)
+        autoBuyFood = Value
+        if autoBuyFood then
+            task.spawn(function()
+                while autoBuyFood do
+                    pcall(function()
+                        local onigiriVal = getItemValue("Onigiri")
+                        local waterVal = getItemValue("Water")
+
+                        if onigiriVal <= 0 then
+                            shopRemote:FireServer("Buy", "Onigiri", 10)
+                            Rayfield:Notify({
+                                Title = "Auto Buy",
+                                Content = "ซื้อ Onigiri x10 เรียบร้อย!",
+                                Duration = 2.5
+                            })
+                            task.wait(1)
+                        end
+
+                        if waterVal <= 0 then
+                            shopRemote:FireServer("Buy", "Water", 10)
+                            Rayfield:Notify({
+                                Title = "Auto Buy",
+                                Content = "ซื้อ Water x10 เรียบร้อย!",
+                                Duration = 2.5
+                            })
+                            task.wait(1)
+                        end
+                    end)
+                    task.wait(2)
+                end
+            end)
+        end
+    end,
+})
+
+-- =================================================================
+-- TAB 4: SETTINGS, INF AFK & TELEPORT
+-- =================================================================
+local autoAntiAfk = false
+local afkConnection = nil
+
+SettingsTab:CreateButton({
+    Name = "Teleport",
+    Callback = function()
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.CFrame = targetCFrame
+            Rayfield:Notify({
+                Title = "Teleport",
+                Content = "วาร์ปไปยังจุดตั้งค่าเรียบร้อย!",
+                Duration = 2
+            })
+        else
+            Rayfield:Notify({
+                Title = "Teleport Error",
+                Content = "ไม่พบตัวละครของคุณ",
+                Duration = 2
+            })
+        end
+    end,
+})
+
+SettingsTab:CreateToggle({
+    Name = " Inf AFK",
+    CurrentValue = false,
+    Flag = "AntiAfkToggle",
+    Callback = function(Value)
+        autoAntiAfk = Value
+        
+        if autoAntiAfk then
+            afkConnection = LocalPlayer.Idled:Connect(function()
+                if autoAntiAfk then
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                    Rayfield:Notify({
+                        Title = "Anti-AFK",
+                        Content = "ระบบช่วยกดกันหลุดให้แล้ว!",
+                        Duration = 2
+                    })
+                end
+            end)
+            
+            Rayfield:Notify({
+                Title = "Anti-AFK Enabled",
+                Content = "เปิดใช้งานระบบกันหลุดแล้ว",
+                Duration = 2
+            })
+        else
+            if afkConnection then
+                afkConnection:Disconnect()
+                afkConnection = nil
+            end
+            Rayfield:Notify({
+                Title = "Anti-AFK Disabled",
+                Content = "ปิดใช้งานระบบกันหลุด",
+                Duration = 2
+            })
+        end
+    end,
+})
+
+-- =================================================================
+-- LOAD NOTIFICATION
+-- =================================================================
+Rayfield:Notify({
+   Title = "Loaded Successfully",
+   Content = "NEVER TOWN OFFICIAL Script Ready!",
+   Duration = 3,
+})
