@@ -3,7 +3,7 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/d
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "The Walking Dead Online 3 Roblox",
+    Title = "The Walking Dead Online 3",
     SubTitle = "BY KUYRAISUS",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
@@ -14,7 +14,8 @@ local Tabs = {
     Aimbot = Window:AddTab({ Title = "Aimbot", Icon = "crosshair" }),
     ESP = Window:AddTab({ Title = "Visuals (ESP)", Icon = "eye" }),
     Teleport = Window:AddTab({ Title = "Teleport", Icon = "map-pin" }),
-    Misc = Window:AddTab({ Title = "Misc / Weapon", Icon = "shield" }),
+    Misc = Window:AddTab({ Title = "Misc / Combat", Icon = "shield" }),
+    Movement = Window:AddTab({ Title = "Movement", Icon = "zap" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
@@ -22,11 +23,13 @@ local Tabs = {
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Remote Event
-local FightEvent = ReplicatedStorage:WaitForChild("CLIENT_REMOTES"):WaitForChild("Fight")
+-- Remote Event (TWD 3 Specific)
+local FightEvent = ReplicatedStorage:WaitForChild("CLIENT_REMOTES", 5) and ReplicatedStorage.CLIENT_REMOTES:WaitForChild("Fight", 5)
 
 -- System Variables
 local AimbotEnabled = false
@@ -35,20 +38,44 @@ local FOVRadius = 100
 local ShowFOV = false
 local AimSmoothing = 1
 local MaxDistance = 1000
+local WhitelistedPlayers = {}
 
 local ESPMaster = false
-local ESPBox = true
+local ESPChams = true
 local ESPName = true
 local ESPDistance = true
 local ESPHealth = true
 
 local NoRecoilEnabled = false
 local NoclipEnabled = false
+local FullBrightEnabled = false
 local SelectedPlayerName = nil
 
 local KillAuraEnabled = false
 local KillAuraRange = 25
 local TargetNPCs = true
+
+-- Movement Variables
+local WalkSpeedValue = 16
+local JumpPowerValue = 50
+local CustomSpeedEnabled = false
+local CustomJumpEnabled = false
+
+local FlyEnabled = false
+local FlySpeed = 50
+local Flying = false
+local BodyVelocity, BodyGyro
+
+local ClickTPEnabled = false
+
+-- Save Original Lighting Settings
+local OldLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    Ambient = Lighting.Ambient
+}
 
 -- FOV Circle Drawing
 local FOVCircle = Drawing.new("Circle")
@@ -58,28 +85,35 @@ FOVCircle.Filled = false
 FOVCircle.Transparency = 1
 
 ---------------------------------------------------------
--- ADVANCED ESP SYSTEM (DRAWING BASED)
+-- FULL BODY ESP SYSTEM
 ---------------------------------------------------------
 local ESPObjects = {}
 
-local function CreateESP(player)
+local function RemoveESP(player)
+    if ESPObjects[player] then
+        pcall(function()
+            if ESPObjects[player].Highlight then ESPObjects[player].Highlight:Destroy() end
+            if ESPObjects[player].Name then ESPObjects[player].Name:Remove() end
+            if ESPObjects[player].Distance then ESPObjects[player].Distance:Remove() end
+            if ESPObjects[player].HealthBarOutline then ESPObjects[player].HealthBarOutline:Remove() end
+            if ESPObjects[player].HealthBar then ESPObjects[player].HealthBar:Remove() end
+        end)
+        ESPObjects[player] = nil
+    end
+end
+
+local function SetupPlayerESP(player)
     if player == LocalPlayer then return end
+    RemoveESP(player)
 
     local objects = {
-        Box = Drawing.new("Square"),
+        Highlight = nil,
         Name = Drawing.new("Text"),
         Distance = Drawing.new("Text"),
         HealthBarOutline = Drawing.new("Square"),
         HealthBar = Drawing.new("Square")
     }
 
-    -- Box Settings
-    objects.Box.Color = Color3.fromRGB(255, 50, 50)
-    objects.Box.Thickness = 2
-    objects.Box.Filled = false
-    objects.Box.Visible = false
-
-    -- Name Settings
     objects.Name.Color = Color3.fromRGB(255, 255, 255)
     objects.Name.Size = 16
     objects.Name.Center = true
@@ -87,7 +121,6 @@ local function CreateESP(player)
     objects.Name.OutlineColor = Color3.fromRGB(0, 0, 0)
     objects.Name.Visible = false
 
-    -- Distance Settings
     objects.Distance.Color = Color3.fromRGB(220, 220, 220)
     objects.Distance.Size = 14
     objects.Distance.Center = true
@@ -95,7 +128,6 @@ local function CreateESP(player)
     objects.Distance.OutlineColor = Color3.fromRGB(0, 0, 0)
     objects.Distance.Visible = false
 
-    -- Health Bar Settings
     objects.HealthBarOutline.Color = Color3.fromRGB(0, 0, 0)
     objects.HealthBarOutline.Thickness = 1
     objects.HealthBarOutline.Filled = true
@@ -107,22 +139,36 @@ local function CreateESP(player)
     objects.HealthBar.Visible = false
 
     ESPObjects[player] = objects
-end
 
-local function RemoveESP(player)
-    if ESPObjects[player] then
-        for _, obj in pairs(ESPObjects[player]) do
-            obj:Remove()
+    local function OnCharacterAdded(character)
+        task.wait(0.2)
+        if not ESPObjects[player] then return end
+
+        if ESPObjects[player].Highlight then
+            pcall(function() ESPObjects[player].Highlight:Destroy() end)
         end
-        ESPObjects[player] = nil
+
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Adornee = character
+        highlight.Enabled = (ESPMaster and ESPChams)
+        highlight.Parent = character
+
+        ESPObjects[player].Highlight = highlight
     end
+
+    if player.Character then task.spawn(OnCharacterAdded, player.Character) end
+    player.CharacterAdded:Connect(OnCharacterAdded)
 end
 
-for _, p in pairs(Players:GetPlayers()) do CreateESP(p) end
-Players.PlayerAdded:Connect(CreateESP)
+for _, p in pairs(Players:GetPlayers()) do SetupPlayerESP(p) end
+Players.PlayerAdded:Connect(SetupPlayerESP)
 Players.PlayerRemoving:Connect(RemoveESP)
 
--- ESP Update Loop
 RunService.RenderStepped:Connect(function()
     for player, objs in pairs(ESPObjects) do
         local char = player.Character
@@ -130,55 +176,47 @@ RunService.RenderStepped:Connect(function()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
 
         if ESPMaster and char and hrp and hum and hum.Health > 0 then
-            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            if objs.Highlight then objs.Highlight.Enabled = ESPChams end
 
-            if onScreen then
-                local head = char:FindFirstChild("Head")
-                local headPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
-                local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3.5, 0))
+            local cf, size = char:GetBoundingBox()
+            local topWorld = cf.Position + Vector3.new(0, (size.Y / 2) + 0.3, 0)
+            local bottomWorld = cf.Position - Vector3.new(0, (size.Y / 2) + 0.3, 0)
 
-                local height = math.abs(headPos.Y - legPos.Y)
-                local width = height / 1.8
+            local topPos, topOnScreen = Camera:WorldToViewportPoint(topWorld)
+            local bottomPos, bottomOnScreen = Camera:WorldToViewportPoint(bottomWorld)
 
-                -- 1. Box ESP
-                if ESPBox then
-                    objs.Box.Size = Vector2.new(width, height)
-                    objs.Box.Position = Vector2.new(pos.X - width / 2, pos.Y - height / 2)
-                    objs.Box.Visible = true
-                else
-                    objs.Box.Visible = false
-                end
+            if topOnScreen or bottomOnScreen then
+                local height = math.abs(topPos.Y - bottomPos.Y)
+                local width = height / 1.45
+                local centerPos = Camera:WorldToViewportPoint(cf.Position)
 
-                -- 2. Name ESP
                 if ESPName then
                     objs.Name.Text = player.DisplayName or player.Name
-                    objs.Name.Position = Vector2.new(pos.X, pos.Y - height / 2 - 20)
+                    objs.Name.Position = Vector2.new(centerPos.X, centerPos.Y - height / 2 - 18)
                     objs.Name.Visible = true
                 else
                     objs.Name.Visible = false
                 end
 
-                -- 3. Distance ESP
                 if ESPDistance then
                     local dist = math.floor((hrp.Position - Camera.CFrame.Position).Magnitude)
                     objs.Distance.Text = "[" .. dist .. "m]"
-                    objs.Distance.Position = Vector2.new(pos.X, pos.Y + height / 2 + 4)
+                    objs.Distance.Position = Vector2.new(centerPos.X, centerPos.Y + height / 2 + 4)
                     objs.Distance.Visible = true
                 else
                     objs.Distance.Visible = false
                 end
 
-                -- 4. Health Bar ESP
                 if ESPHealth then
                     local healthPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
                     local barHeight = height * healthPercent
 
                     objs.HealthBarOutline.Size = Vector2.new(4, height + 2)
-                    objs.HealthBarOutline.Position = Vector2.new(pos.X - width / 2 - 8, pos.Y - height / 2 - 1)
+                    objs.HealthBarOutline.Position = Vector2.new(centerPos.X - width / 2 - 7, centerPos.Y - height / 2 - 1)
                     objs.HealthBarOutline.Visible = true
 
                     objs.HealthBar.Size = Vector2.new(2, barHeight)
-                    objs.HealthBar.Position = Vector2.new(pos.X - width / 2 - 7, (pos.Y + height / 2) - barHeight)
+                    objs.HealthBar.Position = Vector2.new(centerPos.X - width / 2 - 6, (centerPos.Y + height / 2) - barHeight)
                     objs.HealthBar.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthPercent)
                     objs.HealthBar.Visible = true
                 else
@@ -186,10 +224,17 @@ RunService.RenderStepped:Connect(function()
                     objs.HealthBar.Visible = false
                 end
             else
-                for _, obj in pairs(objs) do obj.Visible = false end
+                objs.Name.Visible = false
+                objs.Distance.Visible = false
+                objs.HealthBarOutline.Visible = false
+                objs.HealthBar.Visible = false
             end
         else
-            for _, obj in pairs(objs) do obj.Visible = false end
+            if objs.Highlight then objs.Highlight.Enabled = false end
+            objs.Name.Visible = false
+            objs.Distance.Visible = false
+            objs.HealthBarOutline.Visible = false
+            objs.HealthBar.Visible = false
         end
     end
 end)
@@ -206,13 +251,12 @@ local function GetClosestPlayer()
     if not myHRP then return nil end
 
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(AimTargetPart) and player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.Health > 0 then
+        if player ~= LocalPlayer and not WhitelistedPlayers[player.Name] and player.Character and player.Character:FindFirstChild(AimTargetPart) and player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.Health > 0 then
             local targetPart = player.Character[AimTargetPart]
-            
             local worldDist = (targetPart.Position - myHRP.Position).Magnitude
+
             if worldDist <= MaxDistance then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-
                 if onScreen then
                     local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                     local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
@@ -228,7 +272,6 @@ local function GetClosestPlayer()
     return closestPlayer
 end
 
--- Main Loop (Aimbot, FOV & Noclip)
 RunService.Stepped:Connect(function()
     if NoclipEnabled and LocalPlayer.Character then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
@@ -236,6 +279,12 @@ RunService.Stepped:Connect(function()
                 part.CanCollide = false
             end
         end
+    end
+
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if CustomSpeedEnabled then hum.WalkSpeed = WalkSpeedValue end
+        if CustomJumpEnabled then hum.JumpPower = JumpPowerValue end
     end
 end)
 
@@ -254,13 +303,21 @@ RunService.RenderStepped:Connect(function()
             Camera.CFrame = currentCamCFrame:Lerp(targetCFrame, 1 / AimSmoothing)
         end
     end
+
+    if FullBrightEnabled then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    end
 end)
 
 local function ToggleNoRecoil(val)
     NoRecoilEnabled = val
     task.spawn(function()
         while NoRecoilEnabled do
-            task.wait(0.1)
+            task.wait(0.2)
             for _, v in pairs(getgc(true)) do
                 if type(v) == "table" then
                     if rawget(v, "Recoil") or rawget(v, "recoil") then
@@ -278,11 +335,73 @@ local function ToggleNoRecoil(val)
 end
 
 ---------------------------------------------------------
+-- FLY & CLICK TELEPORT LOGIC
+---------------------------------------------------------
+local function StartFly()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    Flying = true
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    BodyVelocity.Velocity = Vector3.zero
+    BodyVelocity.Parent = hrp
+
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    BodyGyro.CFrame = hrp.CFrame
+    BodyGyro.Parent = hrp
+
+    task.spawn(function()
+        while Flying and hrp and char:FindFirstChildOfClass("Humanoid") do
+            local moveDir = Vector3.zero
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+            BodyVelocity.Velocity = moveDir * FlySpeed
+            BodyGyro.CFrame = Camera.CFrame
+            task.wait()
+        end
+    end)
+end
+
+local function StopFly()
+    Flying = false
+    if BodyVelocity then BodyVelocity:Destroy() end
+    if BodyGyro then BodyGyro:Destroy() end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- Fly Toggle Key (E)
+    if FlyEnabled and input.KeyCode == Enum.KeyCode.E then
+        if Flying then StopFly() else StartFly() end
+    end
+
+    -- Click Teleport (Ctrl + Left Click)
+    if ClickTPEnabled and input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local mouse = LocalPlayer:GetMouse()
+        if mouse and mouse.Hit then
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------
 -- KILL AURA LOGIC
 ---------------------------------------------------------
 local function AttackTarget(targetPart)
-    if not targetPart then return end
-    
+    if not targetPart or not FightEvent then return end
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
@@ -296,13 +415,11 @@ end
 task.spawn(function()
     while true do
         task.wait(0.2)
-        
         if KillAuraEnabled then
             local myChar = LocalPlayer.Character
             local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
             if myHRP then
-                -- 1. โจมตีผู้เล่น
                 for _, player in pairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character then
                         local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
@@ -310,14 +427,11 @@ task.spawn(function()
 
                         if targetHRP and targetHum and targetHum.Health > 0 then
                             local dist = (targetHRP.Position - myHRP.Position).Magnitude
-                            if dist <= KillAuraRange then
-                                AttackTarget(targetHRP)
-                            end
+                            if dist <= KillAuraRange then AttackTarget(targetHRP) end
                         end
                     end
                 end
 
-                -- 2. โจมตี NPC / Zombie
                 if TargetNPCs then
                     for _, obj in pairs(workspace:GetDescendants()) do
                         if obj:IsA("Humanoid") and obj.Parent ~= myChar and obj.Health > 0 then
@@ -325,9 +439,7 @@ task.spawn(function()
                                 local targetHRP = obj.Parent:FindFirstChild("HumanoidRootPart") or obj.Parent:FindFirstChild("PrimaryPart")
                                 if targetHRP then
                                     local dist = (targetHRP.Position - myHRP.Position).Magnitude
-                                    if dist <= KillAuraRange then
-                                        AttackTarget(targetHRP)
-                                    end
+                                    if dist <= KillAuraRange then AttackTarget(targetHRP) end
                                 end
                             end
                         end
@@ -339,57 +451,49 @@ task.spawn(function()
 end)
 
 ---------------------------------------------------------
--- HELPER FUNCTIONS FOR TELEPORT
+-- HELPER FUNCTIONS
 ---------------------------------------------------------
 local function GetPlayerList()
     local list = {}
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(list, p.Name)
-        end
+        if p ~= LocalPlayer then table.insert(list, p.Name) end
     end
-    if #list == 0 then
-        table.insert(list, "ไม่พบผู้เล่นอื่น")
-    end
+    if #list == 0 then table.insert(list, "No Other Players Found") end
     return list
 end
 
 ---------------------------------------------------------
--- UI CONTROLS (Fluent)
+-- UI CONTROLS (Fluent - English)
 ---------------------------------------------------------
 
 -- Tab: Aimbot
-local AimbotToggle = Tabs.Aimbot:AddToggle("AimbotToggle", { Title = "เปิดใช้งาน Aimbot", Default = false })
+local AimbotToggle = Tabs.Aimbot:AddToggle("AimbotToggle", { Title = "Enable Aimbot", Default = false })
 AimbotToggle:OnChanged(function(Value) AimbotEnabled = Value end)
 
 local TargetDropdown = Tabs.Aimbot:AddDropdown("AimTarget", {
-    Title = "ตำแหน่งที่ต้องการล็อค",
-    Values = {"หัว (Head)", "ลำตัว (Torso)"},
+    Title = "Target Body Part",
+    Values = {"Head", "Torso"},
     Multi = false,
     Default = 1,
 })
 TargetDropdown:OnChanged(function(Value)
-    if Value == "หัว (Head)" then
-        AimTargetPart = "Head"
-    else
-        AimTargetPart = "HumanoidRootPart"
-    end
+    AimTargetPart = (Value == "Head") and "Head" or "HumanoidRootPart"
 end)
 
 local DistanceSlider = Tabs.Aimbot:AddSlider("MaxDistanceSlider", {
-    Title = "ระยะล็อคเป้าสูงสุด",
+    Title = "Max Aimbot Distance",
     Min = 50,
-    Max = 1000,
+    Max = 2000,
     Default = 1000,
     Rounding = 0,
 })
 DistanceSlider:OnChanged(function(Value) MaxDistance = Value end)
 
-local FOVToggle = Tabs.Aimbot:AddToggle("FOVToggle", { Title = "แสดงวงกลม FOV", Default = false })
+local FOVToggle = Tabs.Aimbot:AddToggle("FOVToggle", { Title = "Show FOV Circle", Default = false })
 FOVToggle:OnChanged(function(Value) ShowFOV = Value end)
 
 local FOVSlider = Tabs.Aimbot:AddSlider("FOVSlider", {
-    Title = "ขนาดระยะ FOV",
+    Title = "FOV Radius",
     Min = 30,
     Max = 500,
     Default = 100,
@@ -398,7 +502,7 @@ local FOVSlider = Tabs.Aimbot:AddSlider("FOVSlider", {
 FOVSlider:OnChanged(function(Value) FOVRadius = Value end)
 
 local SmoothSlider = Tabs.Aimbot:AddSlider("Smoothness", {
-    Title = "Smooth",
+    Title = "Smoothness Level",
     Min = 1,
     Max = 10,
     Default = 1,
@@ -406,26 +510,53 @@ local SmoothSlider = Tabs.Aimbot:AddSlider("Smoothness", {
 })
 SmoothSlider:OnChanged(function(Value) AimSmoothing = Value end)
 
+Tabs.Aimbot:AddSection("Aimbot Whitelist")
+
+local WhitelistDropdown = Tabs.Aimbot:AddDropdown("WhitelistDropdown", {
+    Title = "Ignore Whitelisted Players",
+    Values = GetPlayerList(),
+    Multi = true,
+    Default = {},
+})
+WhitelistDropdown:OnChanged(function(Value) WhitelistedPlayers = Value end)
+
+Tabs.Aimbot:AddButton({
+    Title = "Refresh Player List",
+    Callback = function() WhitelistDropdown:SetValues(GetPlayerList()) end
+})
+
 -- Tab: ESP
-local ESPMasterToggle = Tabs.ESP:AddToggle("ESPMasterToggle", { Title = "ESP", Default = false })
-ESPMasterToggle:OnChanged(function(Value) ESPMaster = Value end)
+local ESPMasterToggle = Tabs.ESP:AddToggle("ESPMasterToggle", { Title = "Enable Visuals (ESP)", Default = false })
+ESPMasterToggle:OnChanged(function(Value) 
+    ESPMaster = Value 
+    if not Value then
+        for _, objs in pairs(ESPObjects) do
+            if objs.Highlight then objs.Highlight.Enabled = false end
+            objs.Name.Visible = false
+            objs.Distance.Visible = false
+            objs.HealthBarOutline.Visible = false
+            objs.HealthBar.Visible = false
+        end
+    end
+end)
 
-local BoxToggle = Tabs.ESP:AddToggle("ESPBoxToggle", { Title = "แสดงกรอบสีแดง", Default = true })
-BoxToggle:OnChanged(function(Value) ESPBox = Value end)
+local ChamsToggle = Tabs.ESP:AddToggle("ESPChamsToggle", { Title = "Full Body Chams", Default = true })
+ChamsToggle:OnChanged(function(Value) ESPChams = Value end)
 
-local NameToggle = Tabs.ESP:AddToggle("ESPNameToggle", { Title = "แสดงชื่อ", Default = true })
+local NameToggle = Tabs.ESP:AddToggle("ESPNameToggle", { Title = "Show Player Names", Default = true })
 NameToggle:OnChanged(function(Value) ESPName = Value end)
 
-local DistanceToggle = Tabs.ESP:AddToggle("ESPDistanceToggle", { Title = "แสดงระยะทาง", Default = true })
+local DistanceToggle = Tabs.ESP:AddToggle("ESPDistanceToggle", { Title = "Show Distance", Default = true })
 DistanceToggle:OnChanged(function(Value) ESPDistance = Value end)
 
-local HealthToggle = Tabs.ESP:AddToggle("ESPHealthToggle", { Title = "แสดงหลอดเลือด", Default = true })
+local HealthToggle = Tabs.ESP:AddToggle("ESPHealthToggle", { Title = "Show Health Bars", Default = true })
 HealthToggle:OnChanged(function(Value) ESPHealth = Value end)
 
 -- Tab: Teleport
+Tabs.Teleport:AddSection("Map Locations (TWD 3)")
+
 Tabs.Teleport:AddButton({
-    Title = "วาร์ปไป ดาวเทียม",
-    Description = "Teleport to (-1813.34, 293.44, 918.42)",
+    Title = "Teleport to Satellite",
     Callback = function()
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -436,8 +567,7 @@ Tabs.Teleport:AddButton({
 })
 
 Tabs.Teleport:AddButton({
-    Title = "วาร์ปไป ค่ายทหาร",
-    Description = "Teleport to Military Base",
+    Title = "Teleport to Military Base",
     Callback = function()
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -447,31 +577,25 @@ Tabs.Teleport:AddButton({
     end
 })
 
--- Player Teleport System
+Tabs.Teleport:AddSection("Player Teleport")
+
 local PlayerDropdown = Tabs.Teleport:AddDropdown("PlayerTPDropdown", {
-    Title = "เลือกผู้เล่นที่ต้องการวาร์ปหา",
+    Title = "Select Target Player",
     Values = GetPlayerList(),
     Multi = false,
     Default = 1,
 })
-
-PlayerDropdown:OnChanged(function(Value)
-    SelectedPlayerName = Value
-end)
+PlayerDropdown:OnChanged(function(Value) SelectedPlayerName = Value end)
 
 Tabs.Teleport:AddButton({
-    Title = "รีเฟรชรายชื่อผู้เล่น",
-    Description = "อัปเดตรายชื่อผู้เล่นในเซิร์ฟเวอร์",
-    Callback = function()
-        PlayerDropdown:SetValues(GetPlayerList())
-    end
+    Title = "Refresh Player List",
+    Callback = function() PlayerDropdown:SetValues(GetPlayerList()) end
 })
 
 Tabs.Teleport:AddButton({
-    Title = "วาร์ปไปหาผู้เล่นที่เลือก",
-    Description = "Teleport to Target Player",
+    Title = "Teleport to Selected Player",
     Callback = function()
-        if SelectedPlayerName and SelectedPlayerName ~= "ไม่พบผู้เล่นอื่น" then
+        if SelectedPlayerName and SelectedPlayerName ~= "No Other Players Found" then
             local targetPlayer = Players:FindFirstChild(SelectedPlayerName)
             if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local myChar = LocalPlayer.Character
@@ -482,7 +606,7 @@ Tabs.Teleport:AddButton({
             else
                 Fluent:Notify({
                     Title = "Teleport Error",
-                    Content = "ไม่พบตัวละครของผู้เล่นเป้าหมาย",
+                    Content = "Target character not found",
                     Duration = 3
                 })
             end
@@ -490,18 +614,15 @@ Tabs.Teleport:AddButton({
     end
 })
 
--- Tab: Misc / Weapon
-local NoclipToggle = Tabs.Misc:AddToggle("NoclipToggle", { Title = "Noclip", Default = false })
-NoclipToggle:OnChanged(function(Value) NoclipEnabled = Value end)
+local ClickTPToggle = Tabs.Teleport:AddToggle("ClickTPToggle", { Title = "Click Teleport (Ctrl + Left Click)", Default = false })
+ClickTPToggle:OnChanged(function(Value) ClickTPEnabled = Value end)
 
-local RecoilToggle = Tabs.Misc:AddToggle("RecoilToggle", { Title = "No Recoil", Default = false })
-RecoilToggle:OnChanged(function(Value) ToggleNoRecoil(Value) end)
-
-local KillAuraToggle = Tabs.Misc:AddToggle("KillAuraToggle", { Title = "เปิดใช้งาน Kill Aura", Default = false })
+-- Tab: Misc / Combat
+local KillAuraToggle = Tabs.Misc:AddToggle("KillAuraToggle", { Title = "Enable Kill Aura", Default = false })
 KillAuraToggle:OnChanged(function(Value) KillAuraEnabled = Value end)
 
 local KillAuraRangeSlider = Tabs.Misc:AddSlider("KillAuraRangeSlider", {
-    Title = "ระยะ Kill Aura",
+    Title = "Kill Aura Range",
     Min = 5,
     Max = 50,
     Default = 25,
@@ -509,13 +630,84 @@ local KillAuraRangeSlider = Tabs.Misc:AddSlider("KillAuraRangeSlider", {
 })
 KillAuraRangeSlider:OnChanged(function(Value) KillAuraRange = Value end)
 
-local NPCToggle = Tabs.Misc:AddToggle("NPCToggle", { Title = "โจมตี Zombie / NPC", Default = true })
+local NPCToggle = Tabs.Misc:AddToggle("NPCToggle", { Title = "Target Zombies / NPCs", Default = true })
 NPCToggle:OnChanged(function(Value) TargetNPCs = Value end)
 
--- Save System Setup
+local RecoilToggle = Tabs.Misc:AddToggle("RecoilToggle", { Title = "No Recoil", Default = false })
+RecoilToggle:OnChanged(function(Value) ToggleNoRecoil(Value) end)
+
+local NoclipToggle = Tabs.Misc:AddToggle("NoclipToggle", { Title = "Noclip", Default = false })
+NoclipToggle:OnChanged(function(Value) NoclipEnabled = Value end)
+
+local FullBrightToggle = Tabs.Misc:AddToggle("FullBrightToggle", { Title = "FullBright", Default = false })
+FullBrightToggle:OnChanged(function(Value)
+    FullBrightEnabled = Value
+    if not Value then
+        Lighting.Brightness = OldLighting.Brightness
+        Lighting.ClockTime = OldLighting.ClockTime
+        Lighting.FogEnd = OldLighting.FogEnd
+        Lighting.GlobalShadows = OldLighting.GlobalShadows
+        Lighting.Ambient = OldLighting.Ambient
+    end
+end)
+
+-- Tab: Movement
+local SpeedToggle = Tabs.Movement:AddToggle("SpeedToggle", { Title = "Enable Custom WalkSpeed", Default = false })
+SpeedToggle:OnChanged(function(Value)
+    CustomSpeedEnabled = Value
+    if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+    end
+end)
+
+local SpeedSlider = Tabs.Movement:AddSlider("SpeedSlider", {
+    Title = "WalkSpeed Multiplier",
+    Min = 16,
+    Max = 250,
+    Default = 16,
+    Rounding = 0,
+})
+SpeedSlider:OnChanged(function(Value) WalkSpeedValue = Value end)
+
+local JumpToggle = Tabs.Movement:AddToggle("JumpToggle", { Title = "Enable Custom JumpPower", Default = false })
+JumpToggle:OnChanged(function(Value)
+    CustomJumpEnabled = Value
+    if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = 50
+    end
+end)
+
+local JumpSlider = Tabs.Movement:AddSlider("JumpSlider", {
+    Title = "JumpPower Multiplier",
+    Min = 50,
+    Max = 300,
+    Default = 50,
+    Rounding = 0,
+})
+JumpSlider:OnChanged(function(Value) JumpPowerValue = Value end)
+
+Tabs.Movement:AddSection("Fly System")
+
+local FlyToggle = Tabs.Movement:AddToggle("FlyToggle", { Title = "Enable Fly System (Press 'E' to toggle flight)", Default = false })
+FlyToggle:OnChanged(function(Value)
+    FlyEnabled = Value
+    if not Value and Flying then StopFly() end
+end)
+
+local FlySpeedSlider = Tabs.Movement:AddSlider("FlySpeedSlider", {
+    Title = "Fly Speed",
+    Min = 10,
+    Max = 200,
+    Default = 50,
+    Rounding = 0,
+})
+FlySpeedSlider:OnChanged(function(Value) FlySpeed = Value end)
+
+-- Save Manager Setup (Configuration Settings Tab)
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
 SaveManager:BuildConfigSection(Tabs.Settings)
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+
 Window:SelectTab(1)
