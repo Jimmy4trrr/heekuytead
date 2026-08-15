@@ -1,0 +1,424 @@
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- UI Library
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManagerRaw = game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua")
+local InterfaceManagerRaw = game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua")
+
+local SaveManager = (SaveManagerRaw and #SaveManagerRaw > 0) and loadstring(SaveManagerRaw)() or nil
+local InterfaceManager = (InterfaceManagerRaw and #InterfaceManagerRaw > 0) and loadstring(InterfaceManagerRaw)() or nil
+
+-- Remotes
+local KnitServices = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("acecateer_knit@1.7.2"):WaitForChild("knit"):WaitForChild("Services")
+
+local StrengthRemote = KnitServices.StrengthService.RE.ClickRequested
+local RebirthRemote = KnitServices.RebirtService.RE.RebirthButtonClicked
+local SellRemote = KnitServices.DataService.RF.SellAllBackpackLoot
+local UpgradesRemote = KnitServices.UpgradesService.RE
+local WorldRemote = KnitServices.WorldService.RF.TeleportToWorld
+local SpawnRemote = KnitServices.BaseTeleportService.RF.TeleportToSpawn
+
+-- Window
+local Window = Fluent:CreateWindow({
+    Title = "OP script +1 cut grass adventure",
+    SubTitle = "BY KUYRAISUS",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+-- Tabs
+local Tabs = {
+    Farming = Window:AddTab({ Title = "Farming", Icon = "rbxassetid://10723424505" }),
+    RarityLoot = Window:AddTab({ Title = "Rarity Loot", Icon = "rbxassetid://10723345749" }),
+    AutoFarmOP = Window:AddTab({ Title = "Auto Farm OP", Icon = "rbxassetid://10723346959" }),
+    Upgrades = Window:AddTab({ Title = "Upgrades", Icon = "rbxassetid://10734952042" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "rbxassetid://10723407823" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+-- Functions
+local function IsBackpackFull()
+    local isFull = false
+    pcall(function()
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then return end
+        
+        for _, gui in ipairs(playerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") and gui.Visible then
+                local text = gui.Text
+                if text:find("Full") or text:find("FULL") then
+                    isFull = true
+                    break
+                end
+                
+                local current, max = text:match("(%d+)%s*/%s*(%d+)")
+                if current and max and tonumber(current) >= tonumber(max) and tonumber(max) > 0 then
+                    isFull = true
+                    break
+                end
+            end
+        end
+    end)
+    return isFull
+end
+
+LocalPlayer.Idled:Connect(function()
+    if Options.AntiAFK and Options.AntiAFK.Value then
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end
+end)
+
+ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
+    if Options.InstantPickup and Options.InstantPickup.Value then
+        fireproximityprompt(prompt)
+    end
+end)
+
+local function FastInteractWithLoot(model)
+    if not model then return end
+    for _, prompt in ipairs(model:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            task.spawn(function()
+                for i = 1, 3 do
+                    fireproximityprompt(prompt)
+                    task.wait(0.01)
+                end
+            end)
+        end
+    end
+end
+
+-- 1. Farming
+Tabs.Farming:AddToggle("AutoStrength", { Title = "Auto Strength", Default = false })
+Tabs.Farming:AddToggle("AutoRebirth", { Title = "Auto Rebirth", Default = false })
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if Options.AutoStrength and Options.AutoStrength.Value then
+            StrengthRemote:FireServer()
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if Options.AutoRebirth and Options.AutoRebirth.Value then
+            pcall(function()
+                local countText = LocalPlayer.PlayerGui.RebirthGUI.Rebirth.Background.Midleground.Bar.Count.Text
+                local current, max = countText:match("Level%s*(%d+)/(%d+)")
+                if not current then
+                    current, max = countText:match("(%d+)/(%d+)")
+                end
+                if current and max and tonumber(current) >= tonumber(max) then
+                    RebirthRemote:FireServer()
+                end
+            end)
+        end
+    end
+end)
+
+-- 2. Rarity Loot
+local RarityPriority = {
+    ["Primordial"] = 1,
+    ["Ascendant"] = 2,
+    ["Cosmic"] = 3,
+    ["Transcendent"] = 4,
+    ["Eternal"] = 5,
+    ["Celestial"] = 6,
+    ["Divine"] = 7,
+    ["Godly"] = 8,
+    ["Secret"] = 9,
+    ["Mythic"] = 10,
+    ["Legendary"] = 11,
+    ["Epic"] = 12,
+    ["Rare"] = 13,
+    ["Uncommon"] = 14,
+    ["Common"] = 15,
+    ["Nearest"] = 16
+}
+
+local RarityList = {
+    "Primordial", "Ascendant", "Cosmic", "Transcendent", 
+    "Eternal", "Celestial", "Divine", "Godly", "Secret", 
+    "Mythic", "Legendary", "Epic", "Rare", "Uncommon", "Common", "Nearest"
+}
+
+Tabs.RarityLoot:AddDropdown("SelectedRarities", {
+    Title = "Select Target Rarity",
+    Values = RarityList,
+    Multi = true,
+    Default = {}
+})
+
+Tabs.RarityLoot:AddDropdown("FarmMethod", {
+    Title = "Farm Method",
+    Values = {"Teleport", "Walk"},
+    Multi = false,
+    Default = "Teleport"
+})
+
+Tabs.RarityLoot:AddToggle("InstantPickup", { Title = "Instant Pickup", Default = true })
+Tabs.RarityLoot:AddToggle("AutoCollectRarity", { Title = "Auto Collect Selected", Default = false })
+
+local function GetBestTargetLoot()
+    local selected = Options.SelectedRarities.Value
+    local bestModel, bestPart = nil, nil
+    local bestPriority = math.huge
+    local shortestDist = math.huge
+    
+    if not (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
+        return nil, nil
+    end
+    
+    local hrpPos = LocalPlayer.Character.HumanoidRootPart.Position
+
+    for _, zone in ipairs(Workspace.Zones:GetChildren()) do
+        local spawnZone = zone:FindFirstChild("SpawnZone")
+        if spawnZone then
+            for _, model in ipairs(spawnZone:GetChildren()) do
+                local lootGui = model:FindFirstChild("LootGui")
+                if lootGui and lootGui:FindFirstChild("Rarity") then
+                    local rarityText = lootGui.Rarity.Text
+                    local isMatched = false
+                    
+                    if selected["Nearest"] then
+                        isMatched = true
+                    elseif selected[rarityText] then
+                        isMatched = true
+                    end
+
+                    if isMatched then
+                        local primaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                        if primaryPart then
+                            local priority = RarityPriority[rarityText] or 99
+                            local dist = (hrpPos - primaryPart.Position).Magnitude
+                            
+                            if priority < bestPriority then
+                                bestPriority = priority
+                                shortestDist = dist
+                                bestPart = primaryPart
+                                bestModel = model
+                            elseif priority == bestPriority and dist < shortestDist then
+                                shortestDist = dist
+                                bestPart = primaryPart
+                                bestModel = model
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return bestPart, bestModel
+end
+
+task.spawn(function()
+    while task.wait(0.01) do
+        if Options.AutoCollectRarity and Options.AutoCollectRarity.Value then
+            local targetPart, targetModel = GetBestTargetLoot()
+            if targetPart and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                if Options.FarmMethod.Value == "Teleport" then
+                    hrp.CFrame = targetPart.CFrame * CFrame.new(0, 2, 0)
+                elseif Options.FarmMethod.Value == "Walk" then
+                    local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then hum:MoveTo(targetPart.Position) end
+                end
+                
+                FastInteractWithLoot(targetModel)
+                task.wait(0.08)
+            end
+        end
+    end
+end)
+
+-- 3. Auto Farm OP
+local WorldConfigs = {
+    [1] = CFrame.new(522.892944, 32.9000015, 0.100000001, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+    [2] = CFrame.new(765.442749, 32.9000015, 1706.30005, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+    [3] = CFrame.new(763.41803, 34.6999893, 3460.30542, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+}
+
+Tabs.AutoFarmOP:AddSlider("DistanceThreshold", {
+    Title = "Max Teleport Distance",
+    Default = 300,
+    Min = 1,
+    Max = 500,
+    Rounding = 0
+})
+
+for worldNum = 1, 3 do
+    Tabs.AutoFarmOP:AddButton({
+        Title = "Teleport World " .. worldNum,
+        Callback = function()
+            WorldRemote:InvokeServer(worldNum)
+        end
+    })
+    
+    Tabs.AutoFarmOP:AddToggle("AutoFarmW" .. worldNum, { 
+        Title = "Auto Farm World " .. worldNum, 
+        Default = false 
+    })
+    
+    task.spawn(function()
+        local lastTeleportTime = 0
+        
+        while task.wait(0.01) do
+            local toggleKey = "AutoFarmW" .. worldNum
+            if Options[toggleKey] and Options[toggleKey].Value then
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = LocalPlayer.Character.HumanoidRootPart
+                    local targetCF = WorldConfigs[worldNum]
+                    local currentTime = tick()
+                    local maxDistance = Options.DistanceThreshold and Options.DistanceThreshold.Value or 300
+                    
+                    if IsBackpackFull() then
+                        pcall(function()
+                            SpawnRemote:InvokeServer()
+                        end)
+                        task.wait(1)
+                    elseif (currentTime - lastTeleportTime >= 20) or (hrp.Position - targetCF.Position).Magnitude > maxDistance then
+                        hrp.CFrame = targetCF
+                        lastTeleportTime = currentTime
+                        task.wait(0.3)
+                    else
+                        local lootTarget, lootModel = GetBestTargetLoot()
+                        if lootTarget then
+                            local farmMethod = Options.FarmMethod and Options.FarmMethod.Value or "Teleport"
+                            if farmMethod == "Teleport" then
+                                hrp.CFrame = lootTarget.CFrame * CFrame.new(0, 2, 0)
+                            elseif farmMethod == "Walk" then
+                                local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                                if hum then
+                                    hum:MoveTo(lootTarget.Position)
+                                end
+                            end
+                            
+                            FastInteractWithLoot(lootModel)
+                            task.wait(0.08)
+                        end
+                    end
+                end
+            else
+                lastTeleportTime = 0
+            end
+        end
+    end)
+end
+
+-- 4. Upgrades
+Tabs.Upgrades:AddToggle("AutoSell", { Title = "Auto Sell (5s)", Default = false })
+
+task.spawn(function()
+    while task.wait(5) do
+        if Options.AutoSell and Options.AutoSell.Value then
+            pcall(function()
+                SellRemote:InvokeServer()
+            end)
+        end
+    end
+end)
+
+Tabs.Upgrades:AddSection("Stat Upgrades")
+
+local UpgradesList = {
+    {"Auto Upgrade Speed (3s)", "AutoUpgradeSpeed", "SpeedButtonClicked"},
+    {"Auto Upgrade Attack Speed (3s)", "AutoUpgradeAttackSpeed", "AttackSpeedButtonClicked"},
+    {"Auto Upgrade Attack Range (3s)", "AutoUpgradeAttackRange", "AttackRangeButtonClicked"},
+    {"Auto Upgrade Carry (3s)", "AutoUpgradeCarry", "CarryButtonClicked"}
+}
+
+for _, item in ipairs(UpgradesList) do
+    Tabs.Upgrades:AddToggle(item[2], { Title = item[1], Default = false })
+    
+    task.spawn(function()
+        while task.wait(3) do
+            if Options[item[2]] and Options[item[2]].Value then
+                pcall(function()
+                    if UpgradesRemote:FindFirstChild(item[3]) then
+                        UpgradesRemote[item[3]]:FireServer()
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+-- 5. Player
+Tabs.Player:AddToggle("AntiAFK", { Title = "Anti AFK", Default = true })
+
+local CustomWalkSpeed = 16
+Tabs.Player:AddSlider("WalkSpeedSlider", {
+    Title = "WalkSpeed",
+    Default = 16,
+    Min = 16,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value)
+        CustomWalkSpeed = Value
+    end
+})
+
+Tabs.Player:AddToggle("NoclipToggle", { Title = "Noclip", Default = false })
+
+-- Loop ล็อค WalkSpeed ป้องกันสคริปต์เกมหรือปุ่มวิ่งรีเซ็ตค่ากลับ
+RunService.Stepped:Connect(function()
+    pcall(function()
+        if LocalPlayer.Character then
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.WalkSpeed = CustomWalkSpeed
+            end
+        end
+    end)
+end)
+
+RunService.Stepped:Connect(function()
+    if Options.NoclipToggle and Options.NoclipToggle.Value then
+        if LocalPlayer.Character then
+            for _, part in ipairs(LocalPlayer.Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+-- 6. Settings
+if SaveManager and InterfaceManager then
+    SaveManager:SetLibrary(Fluent)
+    InterfaceManager:SetLibrary(Fluent)
+
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetIgnoreIndexes({})
+
+    InterfaceManager:SetFolder("KUYRAISUS_Configs")
+    SaveManager:SetFolder("KUYRAISUS_Configs/Game_Configs")
+
+    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+    SaveManager:BuildConfigSection(Tabs.Settings)
+
+    SaveManager:LoadAutoloadConfig()
+else
+    Tabs.Settings:AddParagraph({
+        Title = "Warning",
+        Content = "Failed to load Config System"
+    })
+end
+
+Window:SelectTab(1)
